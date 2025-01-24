@@ -5,7 +5,7 @@ namespace omnisketch {
 OmniSketchCell::OmniSketchCell() : record_count(0) {
 }
 
-void OmniSketchCell::AddRecord(uint64_t hash, size_t max_sample_size) {
+void OmniSketchCell::AddRecord(const uint64_t hash, const size_t max_sample_size) {
 	min_hash_sketch.AddRecord(hash, max_sample_size);
 	record_count++;
 }

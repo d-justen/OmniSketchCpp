@@ -19,7 +19,7 @@ size_t MinHashSketch::Size() const {
 	return rids.size();
 }
 
-MinHashSketch MinHashSketch::ReduceSampleSize(size_t new_sample_size) const {
+MinHashSketch MinHashSketch::ReduceSampleSize(const size_t new_sample_size) const {
 	assert(rids.size() >= new_sample_size && "Reducing sample size requires rid count >= target samples.");
 	MinHashSketch result;
 	result.rids.insert(rids.cbegin(), std::next(rids.cbegin(), new_sample_size));

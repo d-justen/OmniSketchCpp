@@ -35,15 +35,24 @@ public:
 	}
 
 	template <class T>
+	void FindCells(const T &value, std::vector<const OmniSketchCell *> &result) const {
+		FindCellsInternal(Hash(value), result);
+	}
+
+	template <class T>
 	double EstimateCardinality(const T &value) const {
-		return EstimateCardinalityInternal(Hash(value));
+		std::vector<const OmniSketchCell *> cell_refs;
+		cell_refs.reserve(depth);
+		FindCells(value, cell_refs);
+		return EstimateCardinalityInternal(cell_refs);
 	}
 
 	size_t RecordCount() const;
 
 protected:
 	void AddRecordInternal(uint64_t value_hash, uint64_t rid_hash);
-	double EstimateCardinalityInternal(uint64_t value_hash) const;
+	double EstimateCardinalityInternal(const std::vector<const OmniSketchCell *> &cell_refs) const;
+	void FindCellsInternal(uint64_t value_hash, std::vector<const OmniSketchCell *> &result) const;
 
 	const size_t width;
 	const size_t depth;
