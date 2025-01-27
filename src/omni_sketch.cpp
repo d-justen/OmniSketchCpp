@@ -1,5 +1,7 @@
 #include "omni_sketch.hpp"
 
+#include <cassert>
+
 namespace omnisketch {
 
 OmniSketch::OmniSketch(size_t width_p, size_t depth_p, size_t min_hash_sample_count_p)
@@ -25,30 +27,46 @@ void OmniSketch::AddRecordInternal(const uint64_t value_hash, const uint64_t rid
 	record_count++;
 }
 
-double OmniSketch::EstimateCardinalityInternal(const std::vector<const OmniSketchCell *> &cell_refs) const {
+CardEstResult OmniSketch::EstimateCardinalityInternal(const std::vector<size_t> &cell_idxs) const {
+	assert(cell_idxs.size() == depth);
 	std::vector<const MinHashSketch *> min_hash_sketches;
-	min_hash_sketches.reserve(cell_refs.size());
+	min_hash_sketches.reserve(cell_idxs.size());
 	size_t n_max = 0;
 
-	for (const auto &cell : cell_refs) {
-		min_hash_sketches.push_back(&cell->GetMinHashSketch());
-		n_max = std::max(n_max, cell->RecordCount());
+	for (size_t row_idx = 0; row_idx < depth; row_idx++) {
+		const size_t cell_idx = cell_idxs[row_idx];
+		const auto &cell = cells[row_idx][cell_idx];
+		min_hash_sketches.push_back(&cell.GetMinHashSketch());
+		n_max = std::max(n_max, cell.RecordCount());
 	}
 
-	const auto intersection = MinHashSketch::Intersect(min_hash_sketches);
-	const double card_est = ((double)n_max / (double)min_hash_sample_count) * (double)intersection.Size();
-	return card_est;
+	size_t sample_count = std::min(n_max, min_hash_sample_count);
+
+	CardEstResult result;
+	result.min_hash_sketch = MinHashSketch::Intersect(min_hash_sketches);
+	result.cardinality = ((double)n_max / (double)sample_count) * (double)result.min_hash_sketch.Size();
+	result.max_sample_size = min_hash_sample_count;
+	return result;
 }
 
-void OmniSketch::FindCellsInternal(const uint64_t value_hash, std::vector<const OmniSketchCell *> &result) const {
+void OmniSketch::FindCellsInternal(const uint64_t value_hash, std::vector<size_t> &result) const {
 	uint32_t value_hash_1 = value_hash;
 	uint32_t value_hash_2 = value_hash >> 32;
 
 	for (size_t row_idx = 0; row_idx < depth; row_idx++) {
 		size_t col_idx = ComputeCellIdx(value_hash_1, value_hash_2, row_idx, width);
-		const auto &cell = cells[row_idx][col_idx];
-		result.push_back(&cell);
+		result.push_back(col_idx);
 	}
+}
+size_t OmniSketch::Width() const {
+	return width;
+}
+
+size_t OmniSketch::Depth() const {
+	return depth;
+}
+size_t OmniSketch::MinHashSampleCount() const {
+	return min_hash_sample_count;
 }
 
 } // namespace omnisketch

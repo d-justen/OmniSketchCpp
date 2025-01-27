@@ -1,6 +1,6 @@
 #include "min_hash_sketch.hpp"
 
-#include <assert.h>
+#include <cassert>
 
 namespace omnisketch {
 
@@ -88,6 +88,11 @@ MinHashSketch MinHashSketch::Intersect(const std::vector<const MinHashSketch *> 
 		}
 	}
 	return result;
+}
+void MinHashSketch::Combine(const MinHashSketch &other, const size_t max_sample_size) {
+	for (const auto hash : other.rids) {
+		AddRecord(hash, max_sample_size);
+	}
 }
 
 } // namespace omnisketch

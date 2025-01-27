@@ -2,6 +2,8 @@
 
 #include "omni_sketch.hpp"
 
+#include <algorithm>
+#include <cassert>
 #include <vector>
 
 namespace omnisketch {
@@ -10,33 +12,54 @@ enum class ExpressionType { AND, OR };
 
 class Expression {
 public:
-	Expression(ExpressionType type);
+	explicit Expression(ExpressionType type_p);
+	~Expression() = default;
+	virtual CardEstResult Execute() const = 0;
+	ExpressionType Type() const;
 
 protected:
 	const ExpressionType type;
 };
 
 template <class T>
-class EqExpr : public Expression {
+class OrExpression : public Expression {
 public:
-	EqExpr(OmniSketch *sketch_p, T value_p) : sketch(sketch_p), value(std::move(value_p)) {
+	OrExpression(const OmniSketch *sketch_p, std::vector<T> values_p,
+	             std::vector<std::shared_ptr<Expression>> child_exprs_p = {})
+	    : Expression(ExpressionType::OR), sketch(sketch_p), values(std::move(values_p)),
+	      child_exprs(std::move(child_exprs_p)) {
 	}
 
-	double Execute() {
-		return sketch->EstimateCardinality(value);
+	CardEstResult Execute() const override {
+		CardEstResult result;
+		if (!values.empty()) {
+			assert(sketch);
+			result = sketch->EstimateCardinality<T>(values.data(), values.size());
+		}
+
+		for (const auto &child_expr : child_exprs) {
+			CardEstResult card_est = child_expr->Execute();
+			result.cardinality += card_est.cardinality;
+			result.min_hash_sketch.Combine(card_est.min_hash_sketch, card_est.max_sample_size);
+		}
+
+		return result;
 	}
 
 protected:
 	const OmniSketch *sketch;
-	const T value;
+	const std::vector<T> values;
+	const std::vector<std::shared_ptr<Expression>> child_exprs;
 };
 
-class AndExpr : public Expression {
+class AndExpression : public Expression {
 public:
-	AndExpr();
+	explicit AndExpression(std::vector<std::shared_ptr<Expression>> child_exprs_p);
+
+	CardEstResult Execute() const override;
 
 protected:
-	std::vector<Expression> child_expressions;
+	const std::vector<std::shared_ptr<Expression>> child_exprs;
 };
 
 } // namespace omnisketch
