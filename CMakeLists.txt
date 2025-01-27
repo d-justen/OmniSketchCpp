@@ -19,5 +19,16 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
+set(BENCHMARK_ENABLE_TESTING NO)
+
+FetchContent_Declare(
+        googlebenchmark
+        GIT_REPOSITORY https://github.com/google/benchmark.git
+        GIT_TAG origin/main
+)
+
+FetchContent_MakeAvailable(googlebenchmark)
+
 add_subdirectory(src)
+add_subdirectory(benchmark)
 add_subdirectory(test)
