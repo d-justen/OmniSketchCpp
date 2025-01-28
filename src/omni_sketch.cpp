@@ -70,15 +70,17 @@ size_t OmniSketch::MinHashSampleCount() const {
 }
 
 size_t OmniSketch::EstimateByteSize() const {
-	const size_t vector_size = sizeof(cells) + sizeof(OmniSketchCell) * cells.capacity();
-	size_t vector_content_size = 0;
+	size_t size = sizeof(cells) + sizeof(*cells.begin()) * cells.capacity();
 	for (size_t row_idx = 0; row_idx < depth; row_idx++) {
+		size += cells[row_idx].capacity() * sizeof(OmniSketchCell);
 		for (size_t col_idx = 0; col_idx < width; col_idx++) {
 			const auto &cell = cells[row_idx][col_idx];
-			vector_content_size += cell.GetMinHashSketch().Size() * (32 + sizeof(uint64_t));
+			size += cell.GetMinHashSketch().Size() * (32 + sizeof(uint64_t));
 		}
 	}
+	return size;
 }
+
 void OmniSketch::Combine(const OmniSketch &other) {
 	assert(other.depth == depth);
 	assert(other.width == width);
