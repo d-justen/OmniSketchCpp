@@ -19,6 +19,7 @@ struct CardEstResult {
 class OmniSketch {
 public:
 	OmniSketch(size_t width, size_t depth, size_t min_hash_sample_count_p);
+	virtual ~OmniSketch() = default;
 
 	template <class T, class U>
 	void AddRecord(const T &value, const U &rid) {
