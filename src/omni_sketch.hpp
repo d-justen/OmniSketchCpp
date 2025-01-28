@@ -80,6 +80,8 @@ public:
 	size_t MinHashSampleCount() const;
 	size_t Width() const;
 	size_t Depth() const;
+	size_t EstimateByteSize() const;
+	void Combine(const OmniSketch &other);
 
 protected:
 	void AddRecordInternal(uint64_t value_hash, uint64_t rid_hash);

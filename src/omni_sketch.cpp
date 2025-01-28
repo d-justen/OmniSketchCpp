@@ -69,4 +69,26 @@ size_t OmniSketch::MinHashSampleCount() const {
 	return min_hash_sample_count;
 }
 
+size_t OmniSketch::EstimateByteSize() const {
+	const size_t vector_size = sizeof(cells) + sizeof(OmniSketchCell) * cells.capacity();
+	size_t vector_content_size = 0;
+	for (size_t row_idx = 0; row_idx < depth; row_idx++) {
+		for (size_t col_idx = 0; col_idx < width; col_idx++) {
+			const auto &cell = cells[row_idx][col_idx];
+			vector_content_size += cell.GetMinHashSketch().Size() * (32 + sizeof(uint64_t));
+		}
+	}
+}
+void OmniSketch::Combine(const OmniSketch &other) {
+	assert(other.depth == depth);
+	assert(other.width == width);
+	assert(other.min_hash_sample_count == min_hash_sample_count);
+
+	for (size_t row_idx = 0; row_idx < depth; row_idx++) {
+		for (size_t col_idx = 0; col_idx < width; col_idx++) {
+			cells[row_idx][col_idx].Combine(other.cells[row_idx][col_idx], min_hash_sample_count);
+		}
+	}
+}
+
 } // namespace omnisketch

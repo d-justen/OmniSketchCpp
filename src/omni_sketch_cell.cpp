@@ -22,4 +22,9 @@ const MinHashSketch &OmniSketchCell::GetMinHashSketch() const {
 	return min_hash_sketch;
 }
 
+void OmniSketchCell::Combine(const OmniSketchCell &other, size_t max_sample_size) {
+	record_count += other.record_count;
+	min_hash_sketch.Combine(other.min_hash_sketch, max_sample_size);
+}
+
 } // namespace omnisketch
