@@ -61,21 +61,10 @@ public:
 			value_hashes[value_idx] = Hash(values[value_idx]);
 		}
 
-		CardEstResult result;
-		result.max_sample_size = min_hash_sample_count;
-
-		for (size_t value_idx = 0; value_idx < count; value_idx++) {
-			std::vector<size_t> cell_idxs;
-			cell_idxs.reserve(depth);
-			FindCellsInternal(value_hashes[value_idx], cell_idxs);
-			auto intermediate_result = EstimateCardinalityInternal(cell_idxs);
-			result.min_hash_sketch.Combine(intermediate_result.min_hash_sketch, min_hash_sample_count);
-			result.cardinality += intermediate_result.cardinality;
-		}
-
-		result.cardinality = std::min(result.cardinality, (double)record_count);
-		return result;
+		return EstimateCardinalityHashed(value_hashes.data(), count);
 	}
+
+	CardEstResult EstimateCardinalityHashed(const uint64_t *values, size_t count) const;
 
 	size_t RecordCount() const;
 	size_t MinHashSampleCount() const;
