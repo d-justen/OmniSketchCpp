@@ -19,6 +19,16 @@ size_t MinHashSketch::Size() const {
 	return rids.size();
 }
 
+void MinHashSketch::Combine(const MinHashSketch &other, const size_t max_sample_size) {
+	for (const auto hash : other.rids) {
+		AddRecord(hash, max_sample_size);
+	}
+}
+
+const std::set<uint64_t> &MinHashSketch::GetRids() const {
+	return rids;
+}
+
 MinHashSketch MinHashSketch::ReduceSampleSize(const size_t new_sample_size) const {
 	assert(rids.size() >= new_sample_size && "Reducing sample size requires rid count >= target samples.");
 	MinHashSketch result;
@@ -88,11 +98,6 @@ MinHashSketch MinHashSketch::Intersect(const std::vector<const MinHashSketch *> 
 		}
 	}
 	return result;
-}
-void MinHashSketch::Combine(const MinHashSketch &other, const size_t max_sample_size) {
-	for (const auto hash : other.rids) {
-		AddRecord(hash, max_sample_size);
-	}
 }
 
 } // namespace omnisketch
