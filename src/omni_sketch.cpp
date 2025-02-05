@@ -1,7 +1,5 @@
 #include "omni_sketch.hpp"
 
-#include <cassert>
-
 namespace omnisketch {
 
 OmniSketch::OmniSketch(size_t width_p, size_t depth_p, size_t min_hash_sample_count_p)
@@ -10,6 +8,11 @@ OmniSketch::OmniSketch(size_t width_p, size_t depth_p, size_t min_hash_sample_co
 	for (auto &row : cells) {
 		row.resize(width);
 	}
+}
+
+void OmniSketch::InitializeBuffers(size_t size) {
+	value_hashes = std::make_unique<std::vector<uint64_t>>(size);
+	rid_hashes = std::make_unique<std::vector<uint64_t>>(size);
 }
 
 size_t OmniSketch::RecordCount() const {
