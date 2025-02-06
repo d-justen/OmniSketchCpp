@@ -12,8 +12,9 @@ OmniSketch::OmniSketch(size_t width_p, size_t depth_p, size_t min_hash_sample_co
 
 void OmniSketch::InitializeBuffers(size_t size) {
 	if (size > 0) {
-		value_hashes = std::make_unique<std::vector<uint64_t>>(size);
-		rid_hashes = std::make_unique<std::vector<uint64_t>>(size);
+		// Use old-school initialization for backwards compatibility with C++ 11
+		value_hashes = std::unique_ptr<std::vector<uint64_t>>(new std::vector<uint64_t>(size));
+		rid_hashes = std::unique_ptr<std::vector<uint64_t>>(new std::vector<uint64_t>(size));
 	}
 }
 
@@ -64,7 +65,9 @@ CardEstResult OmniSketch::EstimateCardinalityInternal(const std::vector<size_t> 
 
 	if (n_max == 0) {
 		// OmniSketch does not contain key
-		return {0, {}, min_hash_sample_count};
+		CardEstResult result;
+		result.max_sample_size = min_hash_sample_count;
+		return result;
 	}
 
 	size_t sample_count = std::min(n_max, min_hash_sample_count);
