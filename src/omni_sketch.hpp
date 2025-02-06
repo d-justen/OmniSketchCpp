@@ -62,7 +62,7 @@ public:
 	template <class T>
 	CardEstResult EstimateCardinality(const T *values, size_t count) const {
 		assert(value_hashes && rid_hashes && "Must initialize buffers before adding record batches.");
-		assert(count < value_hashes->size() && "Use larger buffers.");
+		assert(count <= value_hashes->size() && "Use larger buffers.");
 		auto &v_hashes = *value_hashes;
 
 		for (size_t value_idx = 0; value_idx < count; value_idx++) {

@@ -11,8 +11,10 @@ OmniSketch::OmniSketch(size_t width_p, size_t depth_p, size_t min_hash_sample_co
 }
 
 void OmniSketch::InitializeBuffers(size_t size) {
-	value_hashes = std::make_unique<std::vector<uint64_t>>(size);
-	rid_hashes = std::make_unique<std::vector<uint64_t>>(size);
+	if (size > 0) {
+		value_hashes = std::make_unique<std::vector<uint64_t>>(size);
+		rid_hashes = std::make_unique<std::vector<uint64_t>>(size);
+	}
 }
 
 size_t OmniSketch::RecordCount() const {

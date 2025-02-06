@@ -24,10 +24,11 @@ protected:
 template <class T>
 class OrExpression : public Expression {
 public:
-	OrExpression(const OmniSketch *sketch_p, std::vector<T> values_p,
+	OrExpression(OmniSketch *sketch_p, std::vector<T> values_p,
 	             std::vector<std::shared_ptr<Expression>> child_exprs_p = {})
 	    : Expression(ExpressionType::OR), sketch(sketch_p), values(std::move(values_p)),
 	      child_exprs(std::move(child_exprs_p)) {
+		sketch->InitializeBuffers(values.size());
 	}
 
 	CardEstResult Execute() const override {
@@ -47,7 +48,7 @@ public:
 	}
 
 protected:
-	const OmniSketch *sketch;
+	OmniSketch *sketch;
 	const std::vector<T> values;
 	const std::vector<std::shared_ptr<Expression>> child_exprs;
 };
