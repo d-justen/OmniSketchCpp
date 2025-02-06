@@ -121,6 +121,8 @@ void OmniSketch::Combine(const OmniSketch &other) {
 			cells[row_idx][col_idx].Combine(other.cells[row_idx][col_idx], min_hash_sample_count);
 		}
 	}
+
+	record_count += other.record_count;
 }
 
 } // namespace omnisketch
