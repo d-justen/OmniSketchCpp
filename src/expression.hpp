@@ -31,6 +31,8 @@ public:
 		sketch->InitializeBuffers(values.size());
 	}
 
+	virtual ~OrExpression() = default;
+
 	CardEstResult Execute() const override {
 		CardEstResult result;
 		if (!values.empty()) {
@@ -56,6 +58,7 @@ protected:
 class AndExpression : public Expression {
 public:
 	explicit AndExpression(std::vector<std::shared_ptr<Expression>> child_exprs_p);
+	virtual ~AndExpression() = default;
 
 	CardEstResult Execute() const override;
 

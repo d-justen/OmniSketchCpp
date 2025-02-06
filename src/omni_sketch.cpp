@@ -62,6 +62,11 @@ CardEstResult OmniSketch::EstimateCardinalityInternal(const std::vector<size_t> 
 		n_max = std::max(n_max, cell.RecordCount());
 	}
 
+	if (n_max == 0) {
+		// OmniSketch does not contain key
+		return {0, {}, min_hash_sample_count};
+	}
+
 	size_t sample_count = std::min(n_max, min_hash_sample_count);
 
 	CardEstResult result;

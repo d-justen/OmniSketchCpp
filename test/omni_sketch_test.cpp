@@ -14,3 +14,8 @@ TEST(OmniSketchTest, BasicEstimation) {
 	EXPECT_EQ(sketch.RecordCount(), 4);
 	EXPECT_EQ(sketch.EstimateCardinality(0).cardinality, 0);
 }
+
+TEST(OmniSketchTest, NoMatches) {
+	omnisketch::OmniSketch sketch(4, 3, 8);
+	EXPECT_EQ(sketch.EstimateCardinality(17).cardinality, 0);
+}

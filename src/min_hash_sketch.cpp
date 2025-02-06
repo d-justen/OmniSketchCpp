@@ -48,6 +48,10 @@ MinHashSketch MinHashSketch::Intersect(const std::vector<const MinHashSketch *> 
 	std::vector<std::set<uint64_t>::iterator> offsets;
 	offsets.reserve(sketch_count);
 	for (size_t sketch_idx = 0; sketch_idx < sketch_count; sketch_idx++) {
+		if (sketches[sketch_idx]->rids.empty()) {
+			// Intersection cannot be > 0
+			return {};
+		}
 		offsets.push_back(sketches[sketch_idx]->rids.cbegin());
 	}
 
