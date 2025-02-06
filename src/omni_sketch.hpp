@@ -32,7 +32,7 @@ public:
 	template <class T, class U>
 	void AddRecords(T *values, U *rids, size_t count) {
 		assert(value_hashes && rid_hashes && "Must initialize buffers before adding record batches.");
-		assert(count < value_hashes->size() && "Use larger buffers.");
+		assert(count <= value_hashes->size() && "Use larger buffers.");
 		auto &v_hashes = *value_hashes;
 		auto &r_hashes = *rid_hashes;
 
