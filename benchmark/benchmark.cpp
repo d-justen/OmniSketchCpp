@@ -76,7 +76,7 @@ static void BM_OmniSketchIntersectBatched(benchmark::State &state) {
 	std::vector<size_t> search_keys(keys.begin(), std::next(keys.begin(), 1024));
 
 	for (auto _ : state) {
-		auto card = sketch.EstimateCardinality(search_keys.data(), 1024);
+		auto card = sketch.EstimateCardinality(search_keys.data(), 1024, sketch.MinHashSampleCount());
 	}
 }
 

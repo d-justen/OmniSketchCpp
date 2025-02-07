@@ -33,16 +33,17 @@ void OmniSketch::AddRecordInternal(const uint64_t value_hash, const uint64_t rid
 	record_count++;
 }
 
-CardEstResult OmniSketch::EstimateCardinalityHashed(const uint64_t *values, size_t count) const {
+CardEstResult OmniSketch::EstimateCardinalityHashed(const uint64_t *values, size_t count,
+                                                    size_t output_sample_count) const {
 	CardEstResult result;
-	result.max_sample_size = min_hash_sample_count;
+	result.max_sample_size = output_sample_count;
 
 	for (size_t value_idx = 0; value_idx < count; value_idx++) {
 		std::vector<size_t> cell_idxs;
 		cell_idxs.reserve(depth);
 		FindCellsInternal(values[value_idx], cell_idxs);
 		auto intermediate_result = EstimateCardinalityInternal(cell_idxs);
-		result.min_hash_sketch.Combine(intermediate_result.min_hash_sketch, min_hash_sample_count);
+		result.min_hash_sketch.Combine(intermediate_result.min_hash_sketch, result.max_sample_size);
 		result.cardinality += intermediate_result.cardinality;
 	}
 

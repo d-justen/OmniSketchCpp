@@ -60,7 +60,7 @@ public:
 	}
 
 	template <class T>
-	CardEstResult EstimateCardinality(const T *values, size_t count) const {
+	CardEstResult EstimateCardinality(const T *values, size_t count, size_t output_sample_count) const {
 		assert(value_hashes && rid_hashes && "Must initialize buffers before adding record batches.");
 		assert(count <= value_hashes->size() && "Use larger buffers.");
 		auto &v_hashes = *value_hashes;
@@ -69,10 +69,10 @@ public:
 			v_hashes[value_idx] = Hash(values[value_idx]);
 		}
 
-		return EstimateCardinalityHashed(v_hashes.data(), count);
+		return EstimateCardinalityHashed(v_hashes.data(), count, output_sample_count);
 	}
 
-	CardEstResult EstimateCardinalityHashed(const uint64_t *values, size_t count) const;
+	CardEstResult EstimateCardinalityHashed(const uint64_t *values, size_t count, size_t output_sample_count) const;
 
 	size_t RecordCount() const;
 	size_t MinHashSampleCount() const;

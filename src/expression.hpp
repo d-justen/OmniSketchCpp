@@ -28,7 +28,14 @@ public:
 	             std::vector<std::shared_ptr<Expression>> child_exprs_p = {}, bool probe_without_hashing_p = false)
 	    : Expression(ExpressionType::OR), sketch(sketch_p), values(std::move(values_p)),
 	      child_exprs(std::move(child_exprs_p)), probe_without_hashing(probe_without_hashing_p) {
-		sketch->InitializeBuffers(values.size());
+		if (sketch) {
+			assert(!values.empty());
+			sketch->InitializeBuffers(values.size());
+			output_sample_count = sketch->MinHashSampleCount();
+		} else {
+			assert(values.empty());
+			assert(!child_exprs.empty());
+		}
 	}
 
 	virtual ~OrExpression() = default;
@@ -38,10 +45,10 @@ public:
 		if (!values.empty()) {
 			assert(sketch);
 			if (probe_without_hashing) {
-				result =
-				    sketch->EstimateCardinalityHashed(reinterpret_cast<const uint64_t *>(values.data()), values.size());
+				result = sketch->EstimateCardinalityHashed(reinterpret_cast<const uint64_t *>(values.data()),
+				                                           values.size(), output_sample_count);
 			} else {
-				result = sketch->EstimateCardinality<T>(values.data(), values.size());
+				result = sketch->EstimateCardinality<T>(values.data(), values.size(), output_sample_count);
 			}
 		}
 
@@ -54,11 +61,16 @@ public:
 		return result;
 	}
 
+	inline void SetOutputSampleCount(size_t output_sample_count_p) {
+		output_sample_count = output_sample_count_p;
+	}
+
 protected:
 	OmniSketch *sketch;
 	const std::vector<T> values;
 	const std::vector<std::shared_ptr<Expression>> child_exprs;
 	const bool probe_without_hashing;
+	size_t output_sample_count;
 };
 
 class AndExpression : public Expression {
