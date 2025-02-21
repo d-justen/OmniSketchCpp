@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "algorithm/min_hash_set_intersection.hpp"
+#include "algorithm/min_hash_set_operations.hpp"
 #include "min_hash_sketch_test.hpp"
 #include "min_hash_sketch.hpp"
 
@@ -35,8 +35,9 @@ TEST_F(MinHashSketchSet64, Flatten) {
 
 TEST_F(MinHashSketchSet64, FlattenIntersection) {
 	FillSketches();
-	std::vector<omnisketch::MinHashSketch<std::vector<uint64_t>>> flat_sketches{a.Flatten(), b.Flatten(), c.Flatten()};
-	std::vector<const omnisketch::MinHashSketch<std::vector<uint64_t>>*> ptrs{&flat_sketches[0], &flat_sketches[1], &flat_sketches[2]};
+	std::vector<omnisketch::MinHashSketch<std::vector<uint64_t>>> flat_sketches {a.Flatten(), b.Flatten(), c.Flatten()};
+	std::vector<const omnisketch::MinHashSketch<std::vector<uint64_t>> *> ptrs {&flat_sketches[0], &flat_sketches[1],
+	                                                                            &flat_sketches[2]};
 
 	auto result = omnisketch::Algorithm::MultiwayIntersection(ptrs);
 	EXPECT_EQ(result.max_count, SKETCH_SIZE);
@@ -89,7 +90,7 @@ TEST_F(MinHashSketchSet64, UnionThisSideSurvives) {
 	auto a_it = a.hashes.begin();
 	auto a_copy_it = a_copy.hashes.begin();
 
-	for(; a_it != a.hashes.end(); a_it++, a_copy_it++) {
+	for (; a_it != a.hashes.end(); a_it++, a_copy_it++) {
 		EXPECT_EQ(*a_it, *a_copy_it);
 	}
 }
@@ -101,14 +102,14 @@ TEST_F(MinHashSketchSet64, UnionOtherSideSurvives) {
 	auto a_it = a.hashes.begin();
 	auto c_it = c.hashes.begin();
 
-	for(; a_it != a.hashes.end(); a_it++, c_it++) {
+	for (; a_it != a.hashes.end(); a_it++, c_it++) {
 		EXPECT_EQ(*a_it, *c_it);
 	}
 }
 
 TEST_F(MinHashSketchSet64, UnionDuplicates) {
 	FillSketchesNoHash();
-	std::vector<const omnisketch::MinHashSketch<std::set<uint64_t>> *> intersect_ptrs{&b, &c};
+	std::vector<const omnisketch::MinHashSketch<std::set<uint64_t>> *> intersect_ptrs {&b, &c};
 	auto intersection = omnisketch::Algorithm::MultiwayIntersection(intersect_ptrs);
 
 	b.max_count = 16;

@@ -1,6 +1,6 @@
 #include "omni_sketch.hpp"
 
-#include "algorithm/min_hash_set_intersection.hpp"
+#include "algorithm/min_hash_set_operations.hpp"
 
 namespace omnisketch {
 
