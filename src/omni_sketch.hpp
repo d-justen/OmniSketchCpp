@@ -12,9 +12,11 @@ namespace omnisketch {
 using OmniSketchCellVector = std::vector<OmniSketchCell>;
 
 struct CardEstResult {
+	CardEstResult() {}
+	explicit CardEstResult(const size_t max_sample_count) : min_hash_sketch(max_sample_count) {}
+
+	MinHashSketch<std::set<uint64_t>> min_hash_sketch;
 	double cardinality = 0;
-	MinHashSketch min_hash_sketch;
-	size_t max_sample_size = 0;
 };
 
 class OmniSketch {
@@ -24,12 +26,12 @@ public:
 
 	void InitializeBuffers(size_t size);
 
-	template <class T, class U>
+	template <typename T, typename U>
 	void AddRecord(const T &value, const U &rid) {
 		AddRecordInternal(Hash(value), Hash(rid));
 	}
 
-	template <class T, class U>
+	template <typename T, typename U>
 	void AddRecords(T *values, U *rids, size_t count) {
 		assert(value_hashes && rid_hashes && "Must initialize buffers before adding record batches.");
 		assert(count <= value_hashes->size() && "Use larger buffers.");
@@ -46,20 +48,20 @@ public:
 		}
 	}
 
-	template <class T>
-	void FindCells(const T &value, std::vector<size_t> &result) const {
-		FindCellsInternal(Hash(value), result);
+	template <typename T>
+	void GetCellIndices(const T &value, std::vector<size_t> &result) const {
+		AppendCellIndicesInternal(Hash(value), result);
 	}
 
-	template <class T>
+	template <typename T>
 	CardEstResult EstimateCardinality(const T &value) const {
 		std::vector<size_t> cell_idxs;
 		cell_idxs.reserve(depth);
-		FindCells(value, cell_idxs);
+		GetCellIndices(value, cell_idxs);
 		return EstimateCardinalityInternal(cell_idxs);
 	}
 
-	template <class T>
+	template <typename T>
 	CardEstResult EstimateCardinality(const T *values, size_t count, size_t output_sample_count) const {
 		assert(value_hashes && rid_hashes && "Must initialize buffers before adding record batches.");
 		assert(count <= value_hashes->size() && "Use larger buffers.");
@@ -81,16 +83,24 @@ public:
 	size_t EstimateByteSize() const;
 	void Combine(const OmniSketch &other);
 
+	void GetCells(uint64_t value_hash, std::vector<const OmniSketchCell *> &result_cells) const;
+
+	template <typename T>
+	static double EstimateCardinality(const MinHashSketch<T> &min_hash_sketch, size_t n_max, size_t sample_count) {
+		return ((double)n_max / (double)sample_count) * (double)min_hash_sketch.Size();
+	}
+
+	std::vector<OmniSketchCellVector> cells;
 protected:
 	void AddRecordInternal(uint64_t value_hash, uint64_t rid_hash);
 	CardEstResult EstimateCardinalityInternal(const std::vector<size_t> &cell_idxs) const;
-	void FindCellsInternal(uint64_t value_hash, std::vector<size_t> &cell_idxs) const;
+	void AppendCellIndicesInternal(uint64_t value_hash, std::vector<size_t> &result) const;
 
 	const size_t width;
 	const size_t depth;
 	const size_t min_hash_sample_count;
 	size_t record_count;
-	std::vector<OmniSketchCellVector> cells;
+
 	std::unique_ptr<std::vector<uint64_t>> value_hashes;
 	std::unique_ptr<std::vector<uint64_t>> rid_hashes;
 };

@@ -5,7 +5,8 @@ include_directories(
 enable_testing()
 
 set(TEST_SOURCES
-        expression_test.cpp
+        algorithm_test.cpp
+        min_hash_sketch_test.cpp
         omni_sketch_test.cpp
 )
 
