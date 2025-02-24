@@ -3,8 +3,6 @@ include_directories(
 )
 
 set(SOURCE_FILES
-        omni_sketch.cpp
-        omni_sketch_cell.cpp
         min_hash_sketch.cpp
 )
 

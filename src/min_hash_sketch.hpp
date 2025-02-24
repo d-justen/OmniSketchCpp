@@ -9,7 +9,7 @@ namespace omnisketch {
 template <typename T>
 class MinHashSketch {
 public:
-	MinHashSketch() {}
+	MinHashSketch() = default;
 	explicit MinHashSketch(size_t max_count_p) : max_count(max_count_p) {
 	}
 
@@ -46,10 +46,15 @@ public:
 		}
 	}
 
-	MinHashSketch<std::vector<typename T::value_type>> Flatten() {
+	MinHashSketch<std::vector<typename T::value_type>> Flatten() const {
 	    MinHashSketch<std::vector<typename T::value_type>> result(max_count);
 		result.hashes.insert(result.hashes.end(), hashes.begin(), hashes.end());
 		return result;
+	}
+
+
+	static double EstimateCardinality(const MinHashSketch<T> &min_hash_sketch, size_t n_max) {
+		return ((double)n_max / (double)min_hash_sketch.max_count) * (double)min_hash_sketch.Size();
 	}
 
 	/*const std::set<T> &GetRids() const;
