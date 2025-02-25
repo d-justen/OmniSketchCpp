@@ -6,6 +6,7 @@ enable_testing()
 
 set(TEST_SOURCES
         min_hash_sketch_test.cpp
+        omni_sketch_operations_test.cpp
         omni_sketch_test.cpp
 )
 

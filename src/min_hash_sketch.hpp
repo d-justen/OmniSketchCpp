@@ -47,30 +47,18 @@ public:
 	}
 
 	MinHashSketch<std::vector<typename T::value_type>> Flatten() const {
-	    MinHashSketch<std::vector<typename T::value_type>> result(max_count);
+		MinHashSketch<std::vector<typename T::value_type>> result(max_count);
 		result.hashes.insert(result.hashes.end(), hashes.begin(), hashes.end());
 		return result;
 	}
-
 
 	static double EstimateCardinality(const MinHashSketch<T> &min_hash_sketch, size_t n_max) {
 		return ((double)n_max / (double)min_hash_sketch.max_count) * (double)min_hash_sketch.Size();
 	}
 
-	/*const std::set<T> &GetRids() const;
-	static MinHashSketch Intersect(const std::vector<const MinHashSketch *> &sketches);
-	static MinHashSketch Intersect(const std::vector<const MinHashSketch *> &sketches,
-	                               std::vector<std::set<uint64_t>::iterator> &offsets);
-	static MinHashSketch Intersect(const std::vector<const MinHashSketch *> &sketches, T max_hash);
-	static bool IntersectOneStep(const std::vector<const MinHashSketch *> &sketches, T max_hash,
-	                             std::vector<std::set<uint64_t>::iterator> &offsets, T &match);
-	static MinHashSketch Union(const std::vector<const MinHashSketch *> &sketches, size_t sample_count);
-	static MinHashSketch Union(const std::vector<const MinHashSketch *> &sketches);*/
-
 	T hashes;
 	size_t max_count;
 };
-
 
 template <>
 void MinHashSketch<std::vector<uint16_t>>::AddRecord(uint16_t);

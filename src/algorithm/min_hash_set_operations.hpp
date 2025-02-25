@@ -10,10 +10,10 @@ namespace Algorithm {
 
 enum class StepResult : uint8_t { MATCH, NO_MATCH, DONE };
 
-template <typename T>
-static StepResult MultiWayIntersectionStep(const std::vector<const MinHashSketch<T> *> &sketches,
-                                           std::vector<typename T::const_iterator> &offsets,
-                                           typename T::value_type &match) {
+template <typename HashContainerType>
+static StepResult MultiwayIntersectionStep(const std::vector<const MinHashSketch<HashContainerType> *> &sketches,
+                                           std::vector<typename HashContainerType::const_iterator> &offsets,
+                                           typename HashContainerType::value_type &match) {
 	assert(!sketches.empty() && "Sketch vector to intersect must not be empty.");
 
 	const auto &max_rid_first_sketch = sketches[0]->hashes.cend();
@@ -57,26 +57,27 @@ static StepResult MultiWayIntersectionStep(const std::vector<const MinHashSketch
 	return StepResult::DONE;
 }
 
-template <typename T>
-static MinHashSketch<std::set<typename T::value_type>>
-MultiwayIntersection(const std::vector<const MinHashSketch<T> *> &sketches) {
+template <typename HashContainerType>
+static MinHashSketch<std::set<typename HashContainerType::value_type>>
+MultiwayIntersection(const std::vector<const MinHashSketch<HashContainerType> *> &sketches) {
 	assert(!sketches.empty() && "Sketch vector to intersect must not be empty.");
 
 	const size_t output_sketch_size = sketches.front()->max_count;
 
-	std::vector<typename T::const_iterator> offsets;
+	std::vector<typename HashContainerType::const_iterator> offsets;
 	offsets.reserve(sketches.size());
 	for (size_t sketch_idx = 0; sketch_idx < sketches.size(); sketch_idx++) {
 		offsets.push_back(sketches[sketch_idx]->hashes.cbegin());
 	}
 
-	MinHashSketch<std::set<typename T::value_type>> result(output_sketch_size);
-	const typename T::value_type max_hash = std::numeric_limits<typename T::value_type>::max();
+	MinHashSketch<std::set<typename HashContainerType::value_type>> result(output_sketch_size);
+	const typename HashContainerType::value_type max_hash =
+	    std::numeric_limits<typename HashContainerType::value_type>::max();
 
-	typename T::value_type current_hash;
+	typename HashContainerType::value_type current_hash;
 	StepResult step_result;
 	for (size_t i = 0; i < output_sketch_size; i++) {
-		step_result = MultiWayIntersectionStep(sketches, offsets, current_hash);
+		step_result = MultiwayIntersectionStep(sketches, offsets, current_hash);
 		if (step_result == StepResult::MATCH) {
 			result.hashes.insert(current_hash);
 		} else if (step_result == StepResult::DONE) {
@@ -87,16 +88,17 @@ MultiwayIntersection(const std::vector<const MinHashSketch<T> *> &sketches) {
 	return result;
 }
 
-template <typename T>
-static MinHashSketch<std::set<typename T::value_type>>
-MultiwayUnion(const std::vector<const MinHashSketch<T> *> &sketches, size_t output_size = 0) {
+template <typename HashContainerType>
+static MinHashSketch<std::set<typename HashContainerType::value_type>>
+MultiwayUnion(const std::vector<const MinHashSketch<HashContainerType> *> &sketches, size_t output_size = 0) {
 	assert(!sketches.empty() && "Sketch vector to intersect must not be empty.");
 
 	if (output_size == 0) {
 		output_size = sketches.front()->max_count;
 	}
 
-	using IterTuple = std::tuple<typename T::value_type, typename T::const_iterator, typename T::const_iterator>;
+	using IterTuple = std::tuple<typename HashContainerType::value_type, typename HashContainerType::const_iterator,
+	                             typename HashContainerType::const_iterator>;
 	static auto CompareIterTuples = [](const IterTuple &a, const IterTuple &b) {
 		return std::get<0>(a) > std::get<0>(b);
 	};
@@ -111,7 +113,9 @@ MultiwayUnion(const std::vector<const MinHashSketch<T> *> &sketches, size_t outp
 		}
 	}
 
-	MinHashSketch<std::set<typename T::value_type>> result;
+	MinHashSketch<std::set<typename HashContainerType::value_type>> result;
+	result.max_count = output_size;
+
 	while (!iterator_queue.empty()) {
 		if (result.hashes.size() == output_size) {
 			break;
