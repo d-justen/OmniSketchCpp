@@ -77,18 +77,20 @@ struct SketchSet {
 
 	std::vector<const MinHashSketch<ContainerType> *> sketches;
 	std::vector<typename ContainerType::const_iterator> iterators;
-	size_t n_max;
 	typename ContainerType::value_type max_hash;
-	size_t matches = 0;
+	size_t n_max = 0;
+	size_t first_it_offset = 0;
 };
+
+static constexpr double EXCLUSION_THRESHOLD = 0.1;
 
 template <typename ValueType, typename RecordIdType, typename ContainerType>
 CardEstResult<typename ContainerType::value_type>
 SetMembership(const OmniSketch<ValueType, RecordIdType, ContainerType> &sketch, const std::vector<ValueType> &values) {
-	std::vector<SketchSet<ContainerType>> sketches_to_intersect(values.size(), sketch.Depth());
+	const size_t intersection_count = values.size();
+	const size_t min_hash_sample_count = sketch.MinHashSampleCount();
 
-	CardEstResult<typename ContainerType::value_type> union_result;
-	union_result.min_hash_sketch.max_count = sketch.MinHashSampleCount();
+	std::vector<SketchSet<ContainerType>> intersect_sketches(intersection_count, sketch.Depth());
 	const auto &cells = sketch.GetCells();
 
 	for (size_t predicate_idx = 0; predicate_idx < values.size(); predicate_idx++) {
@@ -96,49 +98,72 @@ SetMembership(const OmniSketch<ValueType, RecordIdType, ContainerType> &sketch, 
 
 		for (size_t row_idx = 0; row_idx < sketch.Depth(); row_idx++) {
 			size_t col_idx = ComputeCellIdx(hash.first, hash.second, row_idx, sketch.Width());
-			sketches_to_intersect[predicate_idx].AddCell(row_idx, cells[row_idx][col_idx]);
+			intersect_sketches[predicate_idx].AddCell(row_idx, cells[row_idx][col_idx]);
 		}
 	}
 
-	std::vector<size_t> sketch_idxs(sketches_to_intersect.size());
-	for (size_t i = 0; i < sketch_idxs.size(); i++) {
+	CardEstResult<typename ContainerType::value_type> union_result;
+	union_result.min_hash_sketch.max_count = min_hash_sample_count;
+
+	std::vector<size_t> cardinality_estimates(min_hash_sample_count);
+	std::vector<size_t> exclusion_offset_counts(min_hash_sample_count);
+
+	size_t count = intersection_count;
+	std::vector<size_t> sketch_idxs(count);
+	for (size_t i = 0; i < count; i++) {
 		sketch_idxs[i] = i;
 	}
 
-	uint64_t max_hash = std::numeric_limits<uint64_t>::max();
-	size_t count = sketch_idxs.size();
-	uint64_t current_hash_value;
-	StepResult step_result;
-	size_t steps = 0;
+	auto max_hash = std::numeric_limits<typename ContainerType::value_type>::max();
 
 	while (count > 0) {
-		size_t new_count = 0;
-		for (size_t i = 0; i < count; i++) {
-			const size_t sketch_idx = sketch_idxs[i];
-			auto &min_hash_sketches = sketches_to_intersect[sketch_idx];
-			step_result = Algorithm::MultiwayIntersectionStep(min_hash_sketches.sketches, min_hash_sketches.iterators,
-			                                                  current_hash_value);
+		size_t next_count = 0;
+		for (size_t intersect_idx = 0; intersect_idx < count; intersect_idx++) {
+			const size_t sketch_idx = sketch_idxs[intersect_idx];
+			auto &min_hash_sketches = intersect_sketches[sketch_idx];
+			const size_t offset_before = min_hash_sketches.first_it_offset;
+			typename ContainerType::value_type current_hash_value;
+			const auto step_result =
+			    Algorithm::MultiwayIntersectionStep(min_hash_sketches.sketches, min_hash_sketches.iterators,
+			                                        current_hash_value, min_hash_sketches.first_it_offset);
 
 			if (step_result == StepResult::MATCH) {
-				min_hash_sketches.matches++;
 				union_result.min_hash_sketch.AddRecord(current_hash_value);
 				if (union_result.min_hash_sketch.Size() == union_result.min_hash_sketch.max_count) {
 					max_hash = *union_result.min_hash_sketch.hashes.crbegin();
 				}
+				cardinality_estimates[offset_before] += min_hash_sketches.n_max;
 			}
 
-			if (current_hash_value < max_hash && step_result != StepResult::DONE) {
-				sketch_idxs[new_count++] = sketch_idx;
+			if (step_result != StepResult::DONE) {
+				if (current_hash_value < max_hash) {
+					// There could be another match, look at this offset next round
+					sketch_idxs[next_count++] = sketch_idx;
+				} else if (min_hash_sketches.first_it_offset < exclusion_offset_counts.size()) {
+					// There might be another match, but it would be > max_hash, so we exclude it
+					exclusion_offset_counts[min_hash_sketches.first_it_offset]++;
+				}
 			}
 		}
-		count = new_count;
-		steps++;
+		count = next_count;
 	}
 
-	for (const auto &sketches : sketches_to_intersect) {
-		if (sketches.matches > 0) {
-			union_result.cardinality += (double)sketches.n_max / (double)steps * (double)sketches.matches;
+	size_t denom = 0;
+	size_t current_exclusion_count = 0;
+	for (size_t intersection_idx = 0; intersection_idx < cardinality_estimates.size(); intersection_idx++) {
+		current_exclusion_count += exclusion_offset_counts[intersection_idx];
+		if ((double)current_exclusion_count > intersection_count * EXCLUSION_THRESHOLD) {
+			assert(intersection_idx > 0);
+			break;
 		}
+		denom++;
+		double scale_up = intersection_count / ((double)intersection_count - (double)current_exclusion_count);
+		double scaled_card_est = (double)cardinality_estimates[intersection_idx] * scale_up;
+		union_result.cardinality += scaled_card_est;
+	}
+
+	if (union_result.cardinality > 0) {
+		union_result.cardinality /= (double)denom;
 	}
 
 	return union_result;

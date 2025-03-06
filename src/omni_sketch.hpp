@@ -135,7 +135,7 @@ public:
 			size += cells[row_idx].capacity() * sizeof(OmniSketchCell<HashContainerType>);
 			for (size_t col_idx = 0; col_idx < width; col_idx++) {
 				const auto &cell = cells[row_idx][col_idx];
-				size += cell.GetMinHashSketch().Size() * (32 + sizeof(uint64_t));
+				size += cell.GetMinHashSketch().Size() * sizeof(RecordIdType);
 			}
 		}
 		return size;

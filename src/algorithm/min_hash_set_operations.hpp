@@ -13,19 +13,20 @@ enum class StepResult : uint8_t { MATCH, NO_MATCH, DONE };
 template <typename HashContainerType>
 static StepResult MultiwayIntersectionStep(const std::vector<const MinHashSketch<HashContainerType> *> &sketches,
                                            std::vector<typename HashContainerType::const_iterator> &offsets,
-                                           typename HashContainerType::value_type &match) {
+                                           typename HashContainerType::value_type &current_val,
+                                           size_t &first_it_offset) {
 	assert(!sketches.empty() && "Sketch vector to intersect must not be empty.");
 
 	const auto &max_rid_first_sketch = sketches[0]->hashes.cend();
 
 	if (offsets[0] != max_rid_first_sketch) {
-		match = *offsets[0];
+		current_val = *offsets[0];
 
 		for (size_t sketch_idx = 1; sketch_idx < sketches.size(); sketch_idx++) {
 			auto &other_offset = offsets[sketch_idx];
 			auto other_end = sketches[sketch_idx]->hashes.cend();
 
-			while (other_offset != other_end && *other_offset < match) {
+			while (other_offset != other_end && *other_offset < current_val) {
 				++other_offset;
 			}
 
@@ -33,17 +34,18 @@ static StepResult MultiwayIntersectionStep(const std::vector<const MinHashSketch
 				// There can be no other matches
 				return StepResult::DONE;
 			}
-			if (match == *other_offset) {
+			if (current_val == *other_offset) {
 				// It's a match
 				++other_offset;
 			} else {
 				// No match, skip to next rid geq the mismatch
-				match = *other_offset;
-				while (offsets[0] != max_rid_first_sketch && *offsets[0] < match) {
+				current_val = *other_offset;
+				while (offsets[0] != max_rid_first_sketch && *offsets[0] < current_val) {
 					++offsets[0];
+					++first_it_offset;
 				}
 				if (offsets[0] != max_rid_first_sketch) {
-					match = *offsets[0];
+					current_val = *offsets[0];
 					return StepResult::NO_MATCH;
 				} else {
 					return StepResult::DONE;
@@ -52,6 +54,7 @@ static StepResult MultiwayIntersectionStep(const std::vector<const MinHashSketch
 		}
 
 		++offsets[0];
+		++first_it_offset;
 		return StepResult::MATCH;
 	}
 	return StepResult::DONE;
@@ -76,8 +79,9 @@ MultiwayIntersection(const std::vector<const MinHashSketch<HashContainerType> *>
 
 	typename HashContainerType::value_type current_hash;
 	StepResult step_result;
+	size_t dummy_offset = 0;
 	for (size_t i = 0; i < output_sketch_size; i++) {
-		step_result = MultiwayIntersectionStep(sketches, offsets, current_hash);
+		step_result = MultiwayIntersectionStep(sketches, offsets, current_hash, dummy_offset);
 		if (step_result == StepResult::MATCH) {
 			result.hashes.insert(current_hash);
 		} else if (step_result == StepResult::DONE) {

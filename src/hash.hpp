@@ -32,7 +32,7 @@ inline uint32_t BarrettReduction(uint64_t x) {
 }
 
 inline size_t ComputeCellIdx(uint64_t h1, uint64_t h2, size_t i, size_t width) {
-	return BarrettReduction(h1 + i * h2) % width;
+	return BarrettReduction(h1 + std::pow(i + 1, 2) * h2) % width;
 }
 
 template <class T>
