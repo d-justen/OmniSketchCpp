@@ -130,12 +130,19 @@ public:
 	}
 
 	size_t EstimateByteSize() const {
+		// Vector overhead
 		size_t size = sizeof(cells) + sizeof(*cells.begin()) * cells.capacity();
 		for (size_t row_idx = 0; row_idx < depth; row_idx++) {
+			// OmniSketchCell object overhead
 			size += cells[row_idx].capacity() * sizeof(OmniSketchCell<HashContainerType>);
 			for (size_t col_idx = 0; col_idx < width; col_idx++) {
 				const auto &cell = cells[row_idx][col_idx];
-				size += cell.GetMinHashSketch().Size() * sizeof(RecordIdType);
+				const auto &min_hash_sketch = cell.GetMinHashSketch();
+				// MinHashSketch object overhead
+				size += sizeof(min_hash_sketch);
+				// Record Id Hash Container
+				size +=
+				    sizeof(min_hash_sketch.hashes) + min_hash_sketch.Size() * sizeof(*min_hash_sketch.hashes.begin());
 			}
 		}
 		return size;

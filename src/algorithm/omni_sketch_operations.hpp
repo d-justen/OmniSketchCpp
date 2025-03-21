@@ -6,8 +6,34 @@ namespace omnisketch {
 
 namespace Algorithm {
 
+template <typename HashType>
+CardEstResult<HashType> Intersection(const std::vector<CardEstResult<HashType>> &sketches) {
+	std::vector<const MinHashSketch<std::set<HashType>>> shrinked_sketches;
+	shrinked_sketches.reserve(sketches.size() - 1);
+
+	size_t min_b = UINT64_MAX;
+	for (const auto &sketch : sketches) {
+		min_b = std::min(min_b, sketch.min_hash_sketch.max_count);
+	}
+
+	std::vector<const MinHashSketch<std::set<HashType>> *> sketch_refs;
+	sketch_refs.reserve(sketches.size());
+	double n_max = 0;
+
+	for (const auto &sketch : sketches) {
+		n_max = std::max(n_max, sketch.cardinality);
+		if (sketch.min_hash_sketch.max_count > min_b) {
+			shrinked_sketches.push_back(sketch.min_hash_sketch.Shrink(min_b));
+			sketch_refs.push_back(&shrinked_sketches.back());
+			continue;
+		}
+		sketch_refs.push_back(&sketch.min_hash_sketch);
+	}
+	return OmniSketch<size_t, size_t, std::set<HashType>>::EstimateCardinality(n_max, sketch_refs);
+}
+
 template <typename ValueType, typename RecordIdType, typename ContainerType>
-CardEstResult<typename ContainerType::value_type>
+static CardEstResult<typename ContainerType::value_type>
 ConjunctPointQueries(const std::vector<OmniSketch<ValueType, RecordIdType, ContainerType> *> &omni_sketches,
                      const std::vector<ValueType> &values) {
 	assert(omni_sketches.size() == values.size());
@@ -34,18 +60,19 @@ ConjunctPointQueries(const std::vector<OmniSketch<ValueType, RecordIdType, Conta
 }
 
 template <typename ValueType, typename RecordIdType, typename ContainerType>
-CardEstResult<typename ContainerType::value_type>
-DisjunctPointQueries(const OmniSketch<ValueType, RecordIdType, ContainerType> &omni_sketch,
-                     const std::vector<ValueType> &values) {
+static CardEstResult<typename ContainerType::value_type>
+DisjunctPointQueriesHashed(const OmniSketch<ValueType, RecordIdType, ContainerType> &omni_sketch,
+                           const std::vector<typename ContainerType::value_type> &value_hashes) {
 	std::vector<size_t> cell_idxs(omni_sketch.Depth());
 	std::vector<const MinHashSketch<ContainerType> *> min_hash_sketches(omni_sketch.Depth());
-	std::vector<CardEstResult<typename ContainerType::value_type>> intersect_results(values.size());
-	std::vector<const MinHashSketch<std::set<typename ContainerType::value_type>> *> intersect_ptrs(values.size());
+	std::vector<CardEstResult<typename ContainerType::value_type>> intersect_results(value_hashes.size());
+	std::vector<const MinHashSketch<std::set<typename ContainerType::value_type>> *> intersect_ptrs(
+	    value_hashes.size());
 
 	CardEstResult<typename ContainerType::value_type> result;
 
-	for (size_t query_idx = 0; query_idx < values.size(); query_idx++) {
-		omni_sketch.FindCellIndices(values[query_idx], cell_idxs);
+	for (size_t query_idx = 0; query_idx < value_hashes.size(); query_idx++) {
+		omni_sketch.FindCellIndicesWithHash(value_hashes[query_idx], cell_idxs);
 		size_t n_max = omni_sketch.FindMinHashSketches(cell_idxs, min_hash_sketches);
 		intersect_results[query_idx] =
 		    OmniSketch<ValueType, RecordIdType, ContainerType>::EstimateCardinality(n_max, min_hash_sketches);
@@ -55,6 +82,20 @@ DisjunctPointQueries(const OmniSketch<ValueType, RecordIdType, ContainerType> &o
 
 	result.min_hash_sketch = MultiwayUnion(intersect_ptrs, omni_sketch.MinHashSampleCount());
 	return result;
+}
+
+template <typename ValueType, typename RecordIdType, typename ContainerType>
+static CardEstResult<typename ContainerType::value_type>
+DisjunctPointQueries(const OmniSketch<ValueType, RecordIdType, ContainerType> &omni_sketch,
+                     const std::vector<ValueType> &values) {
+	std::vector<typename ContainerType::value_type> value_hashes;
+	value_hashes.reserve(values.size());
+
+	for (size_t predicate_idx = 0; predicate_idx < values.size(); predicate_idx++) {
+		value_hashes.push_back(Hash(values[predicate_idx]));
+	}
+
+	return DisjunctPointQueriesHashed(omni_sketch, value_hashes);
 }
 
 template <typename ContainerType>
@@ -85,16 +126,17 @@ struct SketchSet {
 static constexpr double EXCLUSION_THRESHOLD = 0.1;
 
 template <typename ValueType, typename RecordIdType, typename ContainerType>
-CardEstResult<typename ContainerType::value_type>
-SetMembership(const OmniSketch<ValueType, RecordIdType, ContainerType> &sketch, const std::vector<ValueType> &values) {
-	const size_t intersection_count = values.size();
+static CardEstResult<typename ContainerType::value_type>
+SetMembershipHashed(const OmniSketch<ValueType, RecordIdType, ContainerType> &sketch,
+                    const std::vector<typename ContainerType::value_type> &value_hashes) {
+	const size_t intersection_count = value_hashes.size();
 	const size_t min_hash_sample_count = sketch.MinHashSampleCount();
 
 	std::vector<SketchSet<ContainerType>> intersect_sketches(intersection_count, sketch.Depth());
 	const auto &cells = sketch.GetCells();
 
-	for (size_t predicate_idx = 0; predicate_idx < values.size(); predicate_idx++) {
-		auto hash = SplitHash(Hash(values[predicate_idx]));
+	for (size_t predicate_idx = 0; predicate_idx < value_hashes.size(); predicate_idx++) {
+		auto hash = SplitHash(value_hashes[predicate_idx]);
 
 		for (size_t row_idx = 0; row_idx < sketch.Depth(); row_idx++) {
 			size_t col_idx = ComputeCellIdx(hash.first, hash.second, row_idx, sketch.Width());
@@ -167,6 +209,19 @@ SetMembership(const OmniSketch<ValueType, RecordIdType, ContainerType> &sketch, 
 	}
 
 	return union_result;
+}
+
+template <typename ValueType, typename RecordIdType, typename ContainerType>
+static CardEstResult<typename ContainerType::value_type>
+SetMembership(const OmniSketch<ValueType, RecordIdType, ContainerType> &sketch, const std::vector<ValueType> &values) {
+	std::vector<typename ContainerType::value_type> value_hashes;
+	value_hashes.reserve(values.size());
+
+	for (size_t predicate_idx = 0; predicate_idx < values.size(); predicate_idx++) {
+		value_hashes.push_back(Hash(values[predicate_idx]));
+	}
+
+	return SetMembershipHashed(sketch, value_hashes);
 }
 
 } // namespace Algorithm

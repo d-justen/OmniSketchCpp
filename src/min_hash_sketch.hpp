@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <set>
 #include <stdexcept>
 #include <vector>
@@ -44,6 +45,14 @@ public:
 				}
 			}
 		}
+	}
+
+	MinHashSketch<T> Shrink(size_t size) const {
+		assert(size < max_count);
+		MinHashSketch<T> result(size);
+		const size_t result_sample_count = std::min(size, hashes.size());
+		result.hashes.insert(hashes.begin(), std::next(hashes.begin(), result_sample_count));
+		return result;
 	}
 
 	MinHashSketch<std::vector<typename T::value_type>> Flatten() const {

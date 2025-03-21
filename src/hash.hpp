@@ -19,20 +19,22 @@ inline uint64_t MurmurHash64(uint64_t x) {
 	return x;
 }
 
-inline uint32_t BarrettReduction(uint64_t x) {
-	static constexpr uint32_t m = (1ULL << 31) - 1;
-	static constexpr uint32_t mu = (1ULL << 62) / m;
+inline uint32_t BarrettReduction(uint32_t x) {
+	static constexpr uint32_t prime = (1 << 19) - 1; // largest prime in uint32_t
+	static constexpr uint64_t mu = UINT64_MAX / prime;
 
-	uint32_t d = ((uint64_t)x * mu) >> 62;
-	x -= d * m;
-	if (x >= m) {
-		x -= m;
+	uint32_t q = ((uint64_t)x * mu) >> 32;
+	uint32_t remainder = x - q * prime;
+	if (remainder >= prime) {
+		remainder -= prime;
 	}
-	return x;
+
+	return remainder;
 }
 
-inline size_t ComputeCellIdx(uint64_t h1, uint64_t h2, size_t i, size_t width) {
-	return BarrettReduction(h1 + std::pow(i + 1, 2) * h2) % width;
+inline size_t ComputeCellIdx(uint32_t h1, uint32_t h2, size_t i, size_t width) {
+	uint32_t new_hash = h1 + ((uint32_t)std::pow(i + 1, 2)) * h2;
+	return BarrettReduction(new_hash) % width;
 }
 
 template <class T>
