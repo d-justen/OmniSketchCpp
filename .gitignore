@@ -1,5 +1,8 @@
 build
 cmake-build-*
+venv
+output
+data
 *~
 .DS_STORE
 .idea

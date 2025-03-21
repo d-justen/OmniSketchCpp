@@ -67,7 +67,7 @@ private:
 		c_city = std::make_shared<StringOmniSketch>(256, 3, 1 << 11);
 
 		std::cout << "Loading lineorder table..." << std::endl;
-		std::ifstream lineorder("lineorder_f.csv");
+		std::ifstream lineorder("data/lineorder_f.csv");
 		std::string line;
 		size_t lineorder_id = 0;
 		while (std::getline(lineorder, line)) {
@@ -84,7 +84,7 @@ private:
 		lineorder.close();
 
 		std::cout << "Loading date table..." << std::endl;
-		std::ifstream date("date_f.csv");
+		std::ifstream date("data/date_f.csv");
 		while (std::getline(date, line)) {
 			auto tokens = Split(line);
 			size_t id = std::stoul(tokens[0]);
@@ -96,7 +96,7 @@ private:
 		date.close();
 
 		std::cout << "Loading part table..." << std::endl;
-		std::ifstream part("part_f.csv");
+		std::ifstream part("data/part_f.csv");
 		while (std::getline(part, line)) {
 			auto tokens = Split(line);
 			size_t id = std::stoul(tokens[0]);
@@ -107,7 +107,7 @@ private:
 		part.close();
 
 		std::cout << "Loading supplier table..." << std::endl;
-		std::ifstream supplier("supplier_f.csv");
+		std::ifstream supplier("data/supplier_f.csv");
 		while (std::getline(supplier, line)) {
 			auto tokens = Split(line);
 			size_t id = std::stoul(tokens[0]);
@@ -118,7 +118,7 @@ private:
 		supplier.close();
 
 		std::cout << "Loading customer table..." << std::endl;
-		std::ifstream customer("customer_f.csv");
+		std::ifstream customer("data/customer_f.csv");
 		while (std::getline(customer, line)) {
 			auto tokens = Split(line);
 			size_t id = std::stoul(tokens[0]);
