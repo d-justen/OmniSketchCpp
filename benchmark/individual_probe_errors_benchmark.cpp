@@ -101,6 +101,7 @@ public:
 		for (auto it = all_values.begin(); it != all_values.begin() + probe_sample_size; ++it) {
 			probe_sample->AddRecord(omnisketch::Hash(*it));
 		}
+		probe_sample->SetRecordCount(JOIN_KEY_COUNT);
 
 		for (auto _ : state) {
 			if (use_approximate_join) {
