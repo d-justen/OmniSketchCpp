@@ -2,8 +2,8 @@
 
 #include <gtest/gtest.h>
 
-#include "hash.hpp"
-#include "min_hash_sketch.hpp"
+#include "include/hash.hpp"
+#include "include/min_hash_sketch.hpp"
 
 static constexpr size_t SKETCH_SIZE = 8;
 static constexpr size_t MATCH_COUNT = 3;

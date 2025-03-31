@@ -6,29 +6,66 @@ project(omnisketch
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(OMNISKETCH_ENABLE_TESTS "Enable tests" OFF)
+option(OMNISKETCH_ENABLE_BENCHMARKS "Enable benchmarks" OFF)
+
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
     cmake_policy(SET CMP0135 NEW)
 endif()
 
-include(FetchContent)
-FetchContent_Declare(
-        googletest
-        URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
-)
-# For Windows: Prevent overriding the parent project's compiler/linker settings
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
+set(SOURCE_FILES
+        src/include/set_membership.hpp
 
-set(BENCHMARK_ENABLE_TESTING NO)
-
-FetchContent_Declare(
-        googlebenchmark
-        GIT_REPOSITORY https://github.com/google/benchmark.git
-        GIT_TAG origin/main
+        src/combinator.cpp
+        src/include/combinator.hpp
+        src/include/hash.hpp
+        src/min_hash_sketch.cpp
+        src/include/min_hash_sketch.hpp
+        src/include/omni_sketch.hpp
+        src/include/omni_sketch.tpp
+        src/omni_sketch_cell.cpp
+        src/include/omni_sketch_cell.hpp
 )
 
-FetchContent_MakeAvailable(googlebenchmark)
+add_library(omnisketch STATIC ${SOURCE_FILES})
 
-add_subdirectory(src)
-add_subdirectory(benchmark)
-add_subdirectory(test)
+target_compile_features(omnisketch PUBLIC cxx_std_14)
+target_include_directories(omnisketch PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/include>
+        $<INSTALL_INTERFACE:src/include>
+)
+
+include(GNUInstallDirs)
+
+install(TARGETS omnisketch EXPORT omnisketch-targets)
+install(DIRECTORY src/include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(EXPORT omnisketch-targets
+        FILE omnisketch-targets.cmake
+        NAMESPACE omnisketch::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/omnisketch)
+
+include(CMakePackageConfigHelpers)
+
+write_basic_package_version_file(
+        "${CMAKE_CURRENT_BINARY_DIR}/omnisketch-config-version.cmake"
+        COMPATIBILITY SameMajorVersion
+)
+
+configure_file(cmake/omnisketch-config.cmake.in "${CMAKE_CURRENT_BINARY_DIR}/omnisketch-config.cmake" @ONLY)
+
+install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/omnisketch-config.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/omnisketch-config-version.cmake"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/omnisketch
+)
+
+# Export package
+export(EXPORT omnisketch-targets FILE "${CMAKE_CURRENT_BINARY_DIR}/omnisketch-targets.cmake" NAMESPACE omnisketch::)
+
+if(OMNISKETCH_ENABLE_BENCHMARKS)
+    add_subdirectory(benchmark)
+endif()
+
+if(OMNISKETCH_ENABLE_TESTS)
+    add_subdirectory(test)
+endif()

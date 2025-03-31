@@ -3,11 +3,16 @@
 This is a C++ OmniSketch library
 
 ## Compilation
+
+For development:
 ```shell
 mkdir build && cd build
-cmake ..
+cmake .. -DOMNISKETCH_ENABLE_TESTS=ON -DOMNISKETCH_ENABLE_BENCHMARKS=ON
 make
 ```
 
-- Run tests with `./test/unittests`
-- Run micro-benchmarks with `./benchmark/micro_benchmarks`
+In CLion, insert into CMake Arguments field in build settings:
+```
+-G Ninja -DOMNISKETCH_ENABLE_TESTS=ON -DOMNISKETCH_ENABLE_BENCHMARKS=ON
+```
+

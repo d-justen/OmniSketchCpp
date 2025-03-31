@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
-#include "omni_sketch.hpp"
-#include "omni_sketch_cell.hpp"
+#include "include/omni_sketch.hpp"
+#include "include/omni_sketch_cell.hpp"
 
 TEST(OmniSketchTest, BasicEstimation) {
 	auto sketch = std::make_shared<omnisketch::PointOmniSketch<int>>(4, 3, 8);

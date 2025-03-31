@@ -1,4 +1,4 @@
-#include "min_hash_sketch.hpp"
+#include "include/min_hash_sketch.hpp"
 
 #include <cassert>
 #include <queue>

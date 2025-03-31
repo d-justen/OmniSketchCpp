@@ -1,7 +1,7 @@
 #pragma once
 
-#include "min_hash_sketch.hpp"
-#include "hash.hpp"
+#include "include/min_hash_sketch.hpp"
+#include "include/hash.hpp"
 
 template <unsigned int MaxSampleSize, unsigned int MatchCount>
 class MinHashSketchFixture : public benchmark::Fixture {

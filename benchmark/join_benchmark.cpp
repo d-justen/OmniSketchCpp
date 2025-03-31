@@ -1,6 +1,6 @@
 #include <benchmark/benchmark.h>
 
-#include "combinator.hpp"
+#include "include/combinator.hpp"
 
 #include <iostream>
 #include <fstream>

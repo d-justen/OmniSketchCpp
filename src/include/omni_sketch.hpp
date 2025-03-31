@@ -1,6 +1,6 @@
 #pragma once
 
-#include "algorithm/set_membership.hpp"
+#include "set_membership.hpp"
 #include "hash.hpp"
 #include "omni_sketch_cell.hpp"
 

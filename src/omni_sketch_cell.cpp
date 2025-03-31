@@ -1,4 +1,4 @@
-#include "omni_sketch_cell.hpp"
+#include "include/omni_sketch_cell.hpp"
 
 namespace omnisketch {
 

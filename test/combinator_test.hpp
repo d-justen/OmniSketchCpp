@@ -1,7 +1,7 @@
 #pragma once
 
 #include <gtest/gtest.h>
-#include "combinator.hpp"
+#include "include/combinator.hpp"
 
 static constexpr size_t WIDTH = 16;
 static constexpr size_t DEPTH = 3;

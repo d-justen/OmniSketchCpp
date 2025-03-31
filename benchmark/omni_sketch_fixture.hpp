@@ -2,7 +2,7 @@
 
 #include <benchmark/benchmark.h>
 
-#include "omni_sketch.hpp"
+#include "include/omni_sketch.hpp"
 
 template <unsigned int WIDTH, unsigned int DEPTH, unsigned int SAMPLE_COUNT>
 class OmniSketchFixture : public benchmark::Fixture {

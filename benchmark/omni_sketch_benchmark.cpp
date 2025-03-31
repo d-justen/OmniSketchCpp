@@ -1,6 +1,6 @@
 #include "omni_sketch_fixture.hpp"
 
-#include "combinator.hpp"
+#include "include/combinator.hpp"
 
 constexpr size_t WIDTH = 256;
 constexpr size_t DEPTH = 3;

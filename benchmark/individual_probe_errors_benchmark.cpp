@@ -1,6 +1,6 @@
 #include <benchmark/benchmark.h>
-#include "combinator.hpp"
-#include "omni_sketch.hpp"
+#include "include/combinator.hpp"
+#include "include/omni_sketch.hpp"
 
 #include <random>
 
