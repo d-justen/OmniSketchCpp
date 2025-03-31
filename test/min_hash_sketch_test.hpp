@@ -12,41 +12,41 @@ template <typename T>
 class MinHashSketchTestFixture : public testing::Test {
 protected:
 	MinHashSketchTestFixture() {
-		a = omnisketch::MinHashSketch<T>(SKETCH_SIZE);
-		b = omnisketch::MinHashSketch<T>(SKETCH_SIZE);
-		c = omnisketch::MinHashSketch<T>(SKETCH_SIZE);
+		a = std::make_shared<T>(SKETCH_SIZE);
+		b = std::make_shared<T>(SKETCH_SIZE);
+		c = std::make_shared<T>(SKETCH_SIZE);
 	}
 
 	void FillSketches() {
 		for (size_t i = 0; i < MATCH_COUNT; i++) {
-			typename T::value_type hash = omnisketch::Hash(i);
-			a.AddRecord(hash);
-			b.AddRecord(hash);
-			c.AddRecord(hash);
+			auto hash = omnisketch::Hash(i);
+			a->AddRecord(hash);
+			b->AddRecord(hash);
+			c->AddRecord(hash);
 		}
 		for (size_t i = MATCH_COUNT; i < SKETCH_SIZE; i++) {
-			typename T::value_type hash_1 = omnisketch::Hash(i);
-			a.AddRecord(hash_1);
-			typename T::value_type hash_2 = omnisketch::Hash(SKETCH_SIZE + i);
-			b.AddRecord(i % 2 == 0 ? hash_1 : hash_2);
-			c.AddRecord(hash_2);
+			auto hash_1 = omnisketch::Hash(i);
+			a->AddRecord(hash_1);
+			auto hash_2 = omnisketch::Hash(SKETCH_SIZE + i);
+			b->AddRecord(i % 2 == 0 ? hash_1 : hash_2);
+			c->AddRecord(hash_2);
 		}
 	}
 
 	void FillSketchesNoHash() {
 		for (size_t i = 0; i < MATCH_COUNT; i++) {
-			a.AddRecord(i);
-			b.AddRecord(i);
-			c.AddRecord(i);
+			a->AddRecord(i);
+			b->AddRecord(i);
+			c->AddRecord(i);
 		}
 		for (size_t i = MATCH_COUNT; i < SKETCH_SIZE; i++) {
-			a.AddRecord(i);
-			b.AddRecord(i % 2 == 0 ? i : SKETCH_SIZE + i);
-			c.AddRecord(SKETCH_SIZE + i);
+			a->AddRecord(i);
+			b->AddRecord(i % 2 == 0 ? i : SKETCH_SIZE + i);
+			c->AddRecord(SKETCH_SIZE + i);
 		}
 	}
 
-	omnisketch::MinHashSketch<T> a;
-	omnisketch::MinHashSketch<T> b;
-	omnisketch::MinHashSketch<T> c;
+	std::shared_ptr<omnisketch::MinHashSketch> a;
+	std::shared_ptr<omnisketch::MinHashSketch> b;
+	std::shared_ptr<omnisketch::MinHashSketch> c;
 };

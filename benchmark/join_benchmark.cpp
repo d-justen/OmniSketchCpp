@@ -1,15 +1,48 @@
 #include <benchmark/benchmark.h>
 
-#include "algorithm/expression.hpp"
-#include "algorithm/join_operations.hpp"
+#include "combinator.hpp"
 
 #include <iostream>
 #include <fstream>
 #include <sstream>
 
 using namespace omnisketch;
-using IntOmniSketch = OmniSketch<size_t, size_t, std::set<uint64_t>>;
-using StringOmniSketch = OmniSketch<std::string, size_t, std::set<uint64_t>>;
+using IntOmniSketch = PointOmniSketch<size_t>;
+using StringOmniSketch = PointOmniSketch<std::string>;
+static constexpr size_t OUTPUT_SIZE = 1024;
+
+enum class SSBQuery : uint64_t { Q1_1, Q1_2, Q1_3, Q2_1, Q2_2, Q2_3, Q3_1, Q3_2, Q3_3, Q3_4, Q4_1, Q4_2, Q4_3 };
+
+size_t GetCardinality(SSBQuery q) {
+	switch (q) {
+	case SSBQuery::Q1_1:
+		return 123856;
+	case SSBQuery::Q1_2:
+		return 4251;
+	case SSBQuery::Q1_3:
+		return 470;
+	case SSBQuery::Q2_1:
+		return 46026;
+	case SSBQuery::Q2_2:
+		return 10577;
+	case SSBQuery::Q2_3:
+		return 1222;
+	case SSBQuery::Q3_1:
+		return 246821;
+	case SSBQuery::Q3_2:
+		return 8606;
+	case SSBQuery::Q3_3:
+		return 329;
+	case SSBQuery::Q3_4:
+		return 5;
+	case SSBQuery::Q4_1:
+		return 90353;
+	case SSBQuery::Q4_2:
+		return 21803;
+	case SSBQuery::Q4_3:
+		return 447;
+	}
+}
 
 class SketchesSingleton {
 public:
@@ -42,32 +75,32 @@ public:
 
 private:
 	SketchesSingleton() {
-		lo_discount = std::make_shared<IntOmniSketch>(256, 3, 1 << 11);
-		lo_quantity = std::make_shared<IntOmniSketch>(256, 3, 1 << 11);
-		lo_orderdate = std::make_shared<IntOmniSketch>(256, 3, 1 << 11);
-		lo_partkey = std::make_shared<IntOmniSketch>(256, 3, 1 << 11);
-		lo_custkey = std::make_shared<IntOmniSketch>(256, 3, 1 << 11);
-		lo_suppkey = std::make_shared<IntOmniSketch>(256, 3, 1 << 11);
+		lo_discount = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
+		lo_quantity = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
+		lo_orderdate = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
+		lo_partkey = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
+		lo_custkey = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
+		lo_suppkey = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
 
-		d_year = std::make_shared<IntOmniSketch>(256, 3, 1 << 11);
-		d_yearmonthnum = std::make_shared<IntOmniSketch>(256, 3, 1 << 11);
-		d_weeknuminyear = std::make_shared<IntOmniSketch>(256, 3, 1 << 11);
-		d_yearmonth = std::make_shared<StringOmniSketch>(256, 3, 1 << 11);
+		d_year = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
+		d_yearmonthnum = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
+		d_weeknuminyear = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
+		d_yearmonth = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
 
-		p_category = std::make_shared<StringOmniSketch>(256, 3, 1 << 11);
-		p_brand = std::make_shared<StringOmniSketch>(256, 3, 1 << 11);
-		p_mfgr = std::make_shared<StringOmniSketch>(256, 3, 1 << 11);
+		p_category = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
+		p_brand = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
+		p_mfgr = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
 
-		s_region = std::make_shared<StringOmniSketch>(256, 3, 1 << 11);
-		s_nation = std::make_shared<StringOmniSketch>(256, 3, 1 << 11);
-		s_city = std::make_shared<StringOmniSketch>(256, 3, 1 << 11);
+		s_region = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
+		s_nation = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
+		s_city = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
 
-		c_region = std::make_shared<StringOmniSketch>(256, 3, 1 << 11);
-		c_nation = std::make_shared<StringOmniSketch>(256, 3, 1 << 11);
-		c_city = std::make_shared<StringOmniSketch>(256, 3, 1 << 11);
+		c_region = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
+		c_nation = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
+		c_city = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
 
 		std::cout << "Loading lineorder table..." << std::endl;
-		std::ifstream lineorder("data/lineorder_f.csv");
+		std::ifstream lineorder("../data/lineorder_f.csv");
 		std::string line;
 		size_t lineorder_id = 0;
 		while (std::getline(lineorder, line)) {
@@ -84,7 +117,7 @@ private:
 		lineorder.close();
 
 		std::cout << "Loading date table..." << std::endl;
-		std::ifstream date("data/date_f.csv");
+		std::ifstream date("../data/date_f.csv");
 		while (std::getline(date, line)) {
 			auto tokens = Split(line);
 			size_t id = std::stoul(tokens[0]);
@@ -96,7 +129,7 @@ private:
 		date.close();
 
 		std::cout << "Loading part table..." << std::endl;
-		std::ifstream part("data/part_f.csv");
+		std::ifstream part("../data/part_f.csv");
 		while (std::getline(part, line)) {
 			auto tokens = Split(line);
 			size_t id = std::stoul(tokens[0]);
@@ -107,7 +140,7 @@ private:
 		part.close();
 
 		std::cout << "Loading supplier table..." << std::endl;
-		std::ifstream supplier("data/supplier_f.csv");
+		std::ifstream supplier("../data/supplier_f.csv");
 		while (std::getline(supplier, line)) {
 			auto tokens = Split(line);
 			size_t id = std::stoul(tokens[0]);
@@ -118,7 +151,7 @@ private:
 		supplier.close();
 
 		std::cout << "Loading customer table..." << std::endl;
-		std::ifstream customer("data/customer_f.csv");
+		std::ifstream customer("../data/customer_f.csv");
 		while (std::getline(customer, line)) {
 			auto tokens = Split(line);
 			size_t id = std::stoul(tokens[0]);
@@ -166,198 +199,162 @@ public:
 		c_city = sketches.c_city;
 	}
 
-	std::vector<double> Q1_1() {
-		std::vector<double> q_errs;
-
-		std::vector<std::unique_ptr<ExpressionResult>> conditions;
-		conditions.push_back(Join(*lo_orderdate, Equals(*d_year, (size_t)1993)));
-		q_errs.push_back(conditions.back()->Cardinality() / 908288);
-		conditions.push_back(Or(*lo_discount, {1, 2, 3}));
-		q_errs.push_back(conditions.back()->Cardinality() / 1636870);
-		conditions.push_back(Or(
-		    *lo_quantity, {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25}));
-		q_errs.push_back(conditions.back()->Cardinality() / 3000182);
-		q_errs.push_back(And<uint64_t>(conditions)->Cardinality() / 123856);
-		return q_errs;
+	template <typename CombinatorType>
+	std::shared_ptr<OmniSketchCell> ExecuteQuery(SSBQuery q) {
+		switch (q) {
+		case SSBQuery::Q1_1:
+			return Q1_1<CombinatorType>();
+		case SSBQuery::Q1_2:
+			return Q1_2<CombinatorType>();
+		case SSBQuery::Q1_3:
+			return Q1_3<CombinatorType>();
+		case SSBQuery::Q2_1:
+			return Q2_1<CombinatorType>();
+		case SSBQuery::Q2_2:
+			return Q2_2<CombinatorType>();
+		case SSBQuery::Q2_3:
+			return Q2_3<CombinatorType>();
+		case SSBQuery::Q3_1:
+			return Q3_1<CombinatorType>();
+		case SSBQuery::Q3_2:
+			return Q3_2<CombinatorType>();
+		case SSBQuery::Q3_3:
+			return Q3_3<CombinatorType>();
+		case SSBQuery::Q3_4:
+			return Q3_4<CombinatorType>();
+		case SSBQuery::Q4_1:
+			return Q4_1<CombinatorType>();
+		case SSBQuery::Q4_2:
+			return Q4_2<CombinatorType>();
+		case SSBQuery::Q4_3:
+			return Q4_3<CombinatorType>();
+		}
 	}
 
-	std::vector<double> Q1_2() {
-		std::vector<double> q_errs;
-
-		std::vector<std::unique_ptr<ExpressionResult>> conditions;
-		conditions.push_back(Join(*lo_orderdate, Equals(*d_yearmonthnum, (size_t)199401)));
-		q_errs.push_back(conditions.back()->Cardinality() / 78532);
-		conditions.push_back(Or(*lo_discount, {4, 5, 6}));
-		q_errs.push_back(conditions.back()->Cardinality() / 1636834);
-		conditions.push_back(Or(*lo_quantity, {26, 27, 28, 29, 30, 31, 32, 33, 34, 35}));
-		q_errs.push_back(conditions.back()->Cardinality() / 1200596);
-		q_errs.push_back(And<uint64_t>(conditions)->Cardinality() / 4251);
-		return q_errs;
+	template <typename CombinatorType>
+	std::shared_ptr<OmniSketchCell> Q1_1() {
+		auto combinator = std::make_unique<CombinatorType>();
+		combinator->AddPredicate(lo_orderdate, d_year->Probe(1993));
+		combinator->AddPredicate(lo_discount, PredicateConverter::ConvertRange(1, 3));
+		combinator->AddPredicate(lo_quantity, PredicateConverter::ConvertRange(1, 25));
+		return combinator->Execute(OUTPUT_SIZE);
 	}
 
-	std::vector<double> Q1_3() {
-		std::vector<double> q_errs;
-
-		std::vector<std::unique_ptr<ExpressionResult>> join_conds;
-		join_conds.push_back(Equals(*d_year, (size_t)1994));
-		join_conds.push_back(Equals(*d_weeknuminyear, (size_t)6));
-
-		std::vector<std::unique_ptr<ExpressionResult>> conditions;
-		auto and_expr = And<uint64_t>(join_conds);
-		conditions.push_back(Join(*lo_orderdate, and_expr));
-		q_errs.push_back(conditions.back()->Cardinality() / 17317);
-		conditions.push_back(Or(*lo_discount, {5, 6, 7}));
-		q_errs.push_back(conditions.back()->Cardinality() / 1637846);
-		conditions.push_back(Or(*lo_quantity, {36, 37, 38, 39, 40}));
-		q_errs.push_back(conditions.back()->Cardinality() / 599734);
-		q_errs.push_back(And<uint64_t>(conditions)->Cardinality() / 470);
-		return q_errs;
+	template <typename CombinatorType>
+	std::shared_ptr<OmniSketchCell> Q1_2() {
+		auto combinator = std::make_unique<CombinatorType>();
+		combinator->AddPredicate(lo_orderdate, d_yearmonthnum->Probe(199401));
+		combinator->AddPredicate(lo_discount, PredicateConverter::ConvertRange(4, 6));
+		combinator->AddPredicate(lo_quantity, PredicateConverter::ConvertRange(26, 35));
+		return combinator->Execute(OUTPUT_SIZE);
 	}
 
-	std::vector<double> Q2_1() {
-		std::vector<double> q_errs;
-		std::vector<std::unique_ptr<ExpressionResult>> conditions;
-		// TODO: Join in date even if it doesn't do anything. Requires filterless OmniSketch intersection
-		conditions.push_back(Join(*lo_partkey, Equals(*p_category, std::string("MFGR#12"))));
-		q_errs.push_back(conditions.back()->Cardinality() / 242241);
-		conditions.push_back(Join(*lo_suppkey, Equals(*s_region, std::string("AMERICA"))));
-		q_errs.push_back(conditions.back()->Cardinality() / 1134621);
-		q_errs.push_back(And<uint64_t>(conditions)->Cardinality() / 46026);
-		return q_errs;
+	template <typename CombinatorType>
+	std::shared_ptr<OmniSketchCell> Q1_3() {
+		auto date_combinator = std::make_unique<CombinatorType>();
+		date_combinator->AddPredicate(d_year, PredicateConverter::ConvertPoint(1994));
+		date_combinator->AddPredicate(d_weeknuminyear, PredicateConverter::ConvertPoint(6));
+
+		auto combinator = std::make_unique<CombinatorType>();
+		combinator->AddPredicate(lo_orderdate, date_combinator->Execute(OUTPUT_SIZE));
+		combinator->AddPredicate(lo_discount, PredicateConverter::ConvertRange(5, 7));
+		combinator->AddPredicate(lo_quantity, PredicateConverter::ConvertRange(36, 40));
+		return combinator->Execute(OUTPUT_SIZE);
 	}
 
-	std::vector<double> Q2_2() {
-		std::vector<double> q_errs;
-		std::vector<std::unique_ptr<ExpressionResult>> conditions;
-		// TODO: Join in date even if it doesn't do anything. Requires filterless OmniSketch intersection
-		conditions.push_back(Join(
-		    *lo_partkey, Or(*p_brand, std::vector<std::string> {"MFGR#2221", "MFGR#2222", "MFGR#2223", "MFGR#2224",
-		                                                        "MFGR#2225", "MFGR#2226", "MFGR#2227", "MFGR#2228"})));
-		q_errs.push_back(conditions.back()->Cardinality() / 47481);
-		conditions.push_back(Join(*lo_suppkey, Equals(*s_region, std::string("ASIA"))));
-		q_errs.push_back(conditions.back()->Cardinality() / 1347093);
-		q_errs.push_back(And<uint64_t>(conditions)->Cardinality() / 10577);
-		return q_errs;
+	template <typename CombinatorType>
+	std::shared_ptr<OmniSketchCell> Q2_1() {
+		auto combinator = std::make_unique<CombinatorType>();
+		combinator->AddPredicate(lo_partkey, p_category->Probe("MFGR#12"));
+		combinator->AddPredicate(lo_suppkey, s_region->Probe("AMERICA"));
+		return combinator->Execute(OUTPUT_SIZE);
 	}
 
-	std::vector<double> Q2_3() {
-		std::vector<double> q_errs;
-
-		std::vector<std::unique_ptr<ExpressionResult>> conditions;
-		// TODO: Join in date even if it doesn't do anything. Requires filterless OmniSketch intersection
-		conditions.push_back(Join(*lo_partkey, Equals(*p_brand, std::string("MFGR#2339"))));
-		q_errs.push_back(conditions.back()->Cardinality() / 6330);
-		conditions.push_back(Join(*lo_suppkey, Equals(*s_region, std::string("EUROPE"))));
-		q_errs.push_back(conditions.back()->Cardinality() / 1140656);
-		q_errs.push_back(And<uint64_t>(conditions)->Cardinality() / 1222);
-		return q_errs;
+	template <typename CombinatorType>
+	std::shared_ptr<OmniSketchCell> Q2_2() {
+		auto combinator = std::make_unique<CombinatorType>();
+		std::vector<std::string> probe_set {"MFGR#2221", "MFGR#2222", "MFGR#2223", "MFGR#2224",
+		                                    "MFGR#2225", "MFGR#2226", "MFGR#2227", "MFGR#2228"};
+		combinator->AddPredicate(lo_partkey, p_brand->ProbeSet(probe_set.data(), probe_set.size()));
+		combinator->AddPredicate(lo_suppkey, s_region->Probe("ASIA"));
+		return combinator->Execute(OUTPUT_SIZE);
 	}
 
-	std::vector<double> Q3_1() {
-		std::vector<double> q_errs;
-
-		std::vector<std::unique_ptr<ExpressionResult>> conditions;
-		conditions.push_back(Join(*lo_custkey, Equals(*c_region, std::string("ASIA"))));
-		q_errs.push_back(conditions.back()->Cardinality() / 1207529);
-		conditions.push_back(Join(*lo_suppkey, Equals(*s_region, std::string("ASIA"))));
-		q_errs.push_back(conditions.back()->Cardinality() / 1347093);
-		conditions.push_back(
-		    Join(*lo_orderdate, Or(*d_year, std::vector<size_t> {1992, 1993, 1994, 1995, 1996, 1997})));
-		q_errs.push_back(conditions.back()->Cardinality() / 5466180);
-		q_errs.push_back(And<uint64_t>(conditions)->Cardinality() / 246821);
-		return q_errs;
+	template <typename CombinatorType>
+	std::shared_ptr<OmniSketchCell> Q2_3() {
+		auto combinator = std::make_unique<CombinatorType>();
+		combinator->AddPredicate(lo_partkey, p_brand->Probe("MFGR#2339"));
+		combinator->AddPredicate(lo_suppkey, s_region->Probe("EUROPE"));
+		return combinator->Execute(OUTPUT_SIZE);
 	}
 
-	std::vector<double> Q3_2() {
-		std::vector<double> q_errs;
-
-		std::vector<std::unique_ptr<ExpressionResult>> conditions;
-		conditions.push_back(Join(*lo_custkey, Equals(*c_nation, std::string("UNITED STATES"))));
-		q_errs.push_back(conditions.back()->Cardinality() / 246734);
-		conditions.push_back(Join(*lo_suppkey, Equals(*s_nation, std::string("UNITED STATES"))));
-		q_errs.push_back(conditions.back()->Cardinality() / 228297);
-
-		conditions.push_back(
-		    Join(*lo_orderdate, Or(*d_year, std::vector<size_t> {1992, 1993, 1994, 1995, 1996, 1997})));
-		q_errs.push_back(conditions.back()->Cardinality() / 5466180);
-		q_errs.push_back(And<uint64_t>(conditions)->Cardinality() / 8606);
-		return q_errs;
+	template <typename CombinatorType>
+	std::shared_ptr<OmniSketchCell> Q3_1() {
+		auto combinator = std::make_unique<CombinatorType>();
+		combinator->AddPredicate(lo_custkey, c_region->Probe("ASIA"));
+		combinator->AddPredicate(lo_suppkey, s_region->Probe("ASIA"));
+		combinator->AddPredicate(lo_orderdate, d_year->ProbeRange(1992, 1997));
+		return combinator->Execute(OUTPUT_SIZE);
 	}
 
-	std::vector<double> Q3_3() {
-		std::vector<double> q_errs;
-
-		std::vector<std::unique_ptr<ExpressionResult>> conditions;
-		conditions.push_back(Join(*lo_custkey, Or(*c_city, std::vector<std::string> {"UNITED KI1", "UNITED KI5"})));
-		q_errs.push_back(conditions.back()->Cardinality() / 41743);
-		conditions.push_back(Join(*lo_suppkey, Or(*s_city, std::vector<std::string> {"UNITED KI1", "UNITED KI5"})));
-		q_errs.push_back(conditions.back()->Cardinality() / 53874);
-		conditions.push_back(
-		    Join(*lo_orderdate, Or(*d_year, std::vector<size_t> {1992, 1993, 1994, 1995, 1996, 1997})));
-		q_errs.push_back(conditions.back()->Cardinality() / 5466180);
-		q_errs.push_back(And<uint64_t>(conditions)->Cardinality() / 339);
-		return q_errs;
+	template <typename CombinatorType>
+	std::shared_ptr<OmniSketchCell> Q3_2() {
+		auto combinator = std::make_unique<CombinatorType>();
+		combinator->AddPredicate(lo_custkey, c_nation->Probe("UNITED STATES"));
+		combinator->AddPredicate(lo_suppkey, s_nation->Probe("UNITED STATES"));
+		combinator->AddPredicate(lo_orderdate, d_year->ProbeRange(1992, 1997));
+		return combinator->Execute(OUTPUT_SIZE);
 	}
 
-	std::vector<double> Q3_4() {
-		std::vector<double> q_errs;
-
-		std::vector<std::unique_ptr<ExpressionResult>> conditions;
-		conditions.push_back(Join(*lo_custkey, Or(*c_city, std::vector<std::string> {"UNITED KI1", "UNITED KI5"})));
-		q_errs.push_back(conditions.back()->Cardinality() / 41743);
-		conditions.push_back(Join(*lo_suppkey, Or(*s_city, std::vector<std::string> {"UNITED KI1", "UNITED KI5"})));
-		q_errs.push_back(conditions.back()->Cardinality() / 53874);
-		conditions.push_back(Join(*lo_orderdate, Equals(*d_yearmonth, std::string("Dec1997"))));
-		q_errs.push_back(conditions.back()->Cardinality() / 77451);
-		q_errs.push_back(And<uint64_t>(conditions)->Cardinality() / 5);
-		return q_errs;
+	template <typename CombinatorType>
+	std::shared_ptr<OmniSketchCell> Q3_3() {
+		auto combinator = std::make_unique<CombinatorType>();
+		std::vector<std::string> probe_set {"UNITED KI1", "UNITED KI5"};
+		combinator->AddPredicate(lo_custkey, c_city->ProbeSet(probe_set.data(), probe_set.size()));
+		combinator->AddPredicate(lo_suppkey, s_city->ProbeSet(probe_set.data(), probe_set.size()));
+		combinator->AddPredicate(lo_orderdate, d_year->ProbeRange(1992, 1997));
+		return combinator->Execute(OUTPUT_SIZE);
 	}
 
-	std::vector<double> Q4_1() {
-		std::vector<double> q_errs;
-
-		std::vector<std::unique_ptr<ExpressionResult>> conditions;
-		// TODO: Join in date even if it doesn't do anything. Requires filterless OmniSketch intersection
-		conditions.push_back(Join(*lo_custkey, Equals(*c_region, std::string("AMERICA"))));
-		q_errs.push_back(conditions.back()->Cardinality() / 1192672);
-		conditions.push_back(Join(*lo_suppkey, Equals(*s_region, std::string("AMERICA"))));
-		q_errs.push_back(conditions.back()->Cardinality() / 1134621);
-		conditions.push_back(Join(*lo_partkey, Or(*p_mfgr, std::vector<std::string> {"MFGR#1", "MFGR#2"})));
-		q_errs.push_back(conditions.back()->Cardinality() / 2391945);
-		q_errs.push_back(And<uint64_t>(conditions)->Cardinality() / 90353);
-		return q_errs;
+	template <typename CombinatorType>
+	std::shared_ptr<OmniSketchCell> Q3_4() {
+		auto combinator = std::make_unique<CombinatorType>();
+		std::vector<std::string> probe_set {"UNITED KI1", "UNITED KI5"};
+		combinator->AddPredicate(lo_custkey, c_city->ProbeSet(probe_set.data(), probe_set.size()));
+		combinator->AddPredicate(lo_suppkey, s_city->ProbeSet(probe_set.data(), probe_set.size()));
+		combinator->AddPredicate(lo_orderdate, d_yearmonth->Probe("Dec1997"));
+		return combinator->Execute(OUTPUT_SIZE);
 	}
 
-	std::vector<double> Q4_2() {
-		std::vector<double> q_errs;
-
-		std::vector<std::unique_ptr<ExpressionResult>> conditions;
-		conditions.push_back(Join(*lo_custkey, Equals(*c_region, std::string("AMERICA"))));
-		q_errs.push_back(conditions.back()->Cardinality() / 1192672);
-		conditions.push_back(Join(*lo_suppkey, Equals(*s_region, std::string("AMERICA"))));
-		q_errs.push_back(conditions.back()->Cardinality() / 1134621);
-		conditions.push_back(Join(*lo_partkey, Or(*p_mfgr, std::vector<std::string> {"MFGR#1", "MFGR#2"})));
-		q_errs.push_back(conditions.back()->Cardinality() / 2391945);
-		conditions.push_back(Join(*lo_orderdate, Or(*d_year, std::vector<size_t> {1997, 1998})));
-		q_errs.push_back(conditions.back()->Cardinality() / 1444989);
-		q_errs.push_back(And<uint64_t>(conditions)->Cardinality() / 21803);
-		return q_errs;
+	template <typename CombinatorType>
+	std::shared_ptr<OmniSketchCell> Q4_1() {
+		auto combinator = std::make_unique<CombinatorType>();
+		combinator->AddPredicate(lo_custkey, c_region->Probe("AMERICA"));
+		combinator->AddPredicate(lo_suppkey, s_region->Probe("AMERICA"));
+		std::vector<std::string> probe_set {"MFGR#1", "MFGR#2"};
+		combinator->AddPredicate(lo_partkey, p_mfgr->ProbeSet(probe_set.data(), probe_set.size()));
+		return combinator->Execute(OUTPUT_SIZE);
 	}
 
-	std::vector<double> Q4_3() {
-		std::vector<double> q_errs;
+	template <typename CombinatorType>
+	std::shared_ptr<OmniSketchCell> Q4_2() {
+		auto combinator = std::make_unique<CombinatorType>();
+		combinator->AddPredicate(lo_custkey, c_region->Probe("AMERICA"));
+		combinator->AddPredicate(lo_suppkey, s_region->Probe("AMERICA"));
+		std::vector<std::string> probe_set {"MFGR#1", "MFGR#2"};
+		combinator->AddPredicate(lo_partkey, p_mfgr->ProbeSet(probe_set.data(), probe_set.size()));
+		combinator->AddPredicate(lo_orderdate, d_year->ProbeRange(1997, 1998));
+		return combinator->Execute(OUTPUT_SIZE);
+	}
 
-		std::vector<std::unique_ptr<ExpressionResult>> conditions;
-		conditions.push_back(Join(*lo_custkey, Equals(*c_region, std::string("AMERICA"))));
-		q_errs.push_back(conditions.back()->Cardinality() / 1192672);
-		conditions.push_back(Join(*lo_suppkey, Equals(*s_nation, std::string("UNITED STATES"))));
-		q_errs.push_back(conditions.back()->Cardinality() / 228297);
-		conditions.push_back(Join(*lo_partkey, Equals(*p_category, std::string("MFGR#14"))));
-		q_errs.push_back(conditions.back()->Cardinality() / 240848);
-		conditions.push_back(Join(*lo_orderdate, Or(*d_year, std::vector<size_t> {1997, 1998})));
-		q_errs.push_back(conditions.back()->Cardinality() / 1444989);
-		q_errs.push_back(And<uint64_t>(conditions)->Cardinality() / 447);
-		return q_errs;
+	template <typename CombinatorType>
+	std::shared_ptr<OmniSketchCell> Q4_3() {
+		auto combinator = std::make_unique<CombinatorType>();
+		combinator->AddPredicate(lo_custkey, c_region->Probe("AMERICA"));
+		combinator->AddPredicate(lo_suppkey, s_nation->Probe("UNITED STATES"));
+		combinator->AddPredicate(lo_partkey, p_category->Probe("MFGR#14"));
+		combinator->AddPredicate(lo_orderdate, d_year->ProbeRange(1997, 1998));
+		return combinator->Execute(OUTPUT_SIZE);
 	}
 
 protected:
@@ -382,134 +379,28 @@ protected:
 	std::shared_ptr<StringOmniSketch> c_city;
 };
 
-BENCHMARK_F(SSBFixture, Query1_1)(::benchmark::State &state) {
+BENCHMARK_DEFINE_F(SSBFixture, UncorrelatedCombination)(::benchmark::State &state) {
+	auto query = static_cast<SSBQuery>(state.range());
 	for (auto _ : state) {
-		auto card_ests = Q1_1();
-		for (size_t i = 0; i < card_ests.size(); i++) {
-			state.counters["QErr" + std::to_string(i)] = card_ests[i];
-		}
-		state.counters["CardEst"] = card_ests.back() * 123856;
+		auto result = ExecuteQuery<UncorrelatedCombinator>(query);
+		state.counters["Card"] = (double)GetCardinality(query);
+		state.counters["Est"] = (double)result->RecordCount();
+		state.counters["QErr"] = (double)result->RecordCount() / (double)GetCardinality(query);
 	}
 }
 
-BENCHMARK_F(SSBFixture, Query1_2)(::benchmark::State &state) {
+BENCHMARK_REGISTER_F(SSBFixture, UncorrelatedCombination)->DenseRange(0, 12, 1);
+
+BENCHMARK_DEFINE_F(SSBFixture, ExhaustiveCombination)(::benchmark::State &state) {
+	auto query = static_cast<SSBQuery>(state.range());
 	for (auto _ : state) {
-		auto card_ests = Q1_2();
-		for (size_t i = 0; i < card_ests.size(); i++) {
-			state.counters["QErr" + std::to_string(i)] = card_ests[i];
-		}
-		state.counters["CardEst"] = card_ests.back() * 4251;
+		auto result = ExecuteQuery<ExhaustiveCombinator>(query);
+		state.counters["Card"] = (double)GetCardinality(query);
+		state.counters["Est"] = (double)result->RecordCount();
+		state.counters["QErr"] = (double)result->RecordCount() / (double)GetCardinality(query);
 	}
 }
 
-BENCHMARK_F(SSBFixture, Query1_3)(::benchmark::State &state) {
-	for (auto _ : state) {
-		auto card_ests = Q1_3();
-		for (size_t i = 0; i < card_ests.size(); i++) {
-			state.counters["QErr" + std::to_string(i)] = card_ests[i];
-		}
-		state.counters["CardEst"] = card_ests.back() * 470;
-	}
-}
-
-BENCHMARK_F(SSBFixture, Query2_1)(::benchmark::State &state) {
-	for (auto _ : state) {
-		auto card_ests = Q2_1();
-		for (size_t i = 0; i < card_ests.size(); i++) {
-			state.counters["QErr" + std::to_string(i)] = card_ests[i];
-		}
-		state.counters["CardEst"] = card_ests.back() * 46026;
-	}
-}
-
-BENCHMARK_F(SSBFixture, Query2_2)(::benchmark::State &state) {
-	for (auto _ : state) {
-		auto card_ests = Q2_2();
-		for (size_t i = 0; i < card_ests.size(); i++) {
-			state.counters["QErr" + std::to_string(i)] = card_ests[i];
-		}
-		state.counters["CardEst"] = card_ests.back() * 10577;
-	}
-}
-
-BENCHMARK_F(SSBFixture, Query2_3)(::benchmark::State &state) {
-	for (auto _ : state) {
-		auto card_ests = Q2_3();
-		for (size_t i = 0; i < card_ests.size(); i++) {
-			state.counters["QErr" + std::to_string(i)] = card_ests[i];
-		}
-		state.counters["CardEst"] = card_ests.back() * 1222;
-	}
-}
-
-BENCHMARK_F(SSBFixture, Query3_1)(::benchmark::State &state) {
-	for (auto _ : state) {
-		auto card_ests = Q3_1();
-		for (size_t i = 0; i < card_ests.size(); i++) {
-			state.counters["QErr" + std::to_string(i)] = card_ests[i];
-		}
-		state.counters["CardEst"] = card_ests.back() * 246821;
-	}
-}
-
-BENCHMARK_F(SSBFixture, Query3_2)(::benchmark::State &state) {
-	for (auto _ : state) {
-		auto card_ests = Q3_2();
-		for (size_t i = 0; i < card_ests.size(); i++) {
-			state.counters["QErr" + std::to_string(i)] = card_ests[i];
-		}
-		state.counters["CardEst"] = card_ests.back() * 8606;
-	}
-}
-
-BENCHMARK_F(SSBFixture, Query3_3)(::benchmark::State &state) {
-	for (auto _ : state) {
-		auto card_ests = Q3_3();
-		for (size_t i = 0; i < card_ests.size(); i++) {
-			state.counters["QErr" + std::to_string(i)] = card_ests[i];
-		}
-		state.counters["CardEst"] = card_ests.back() * 329;
-	}
-}
-
-BENCHMARK_F(SSBFixture, Query3_4)(::benchmark::State &state) {
-	for (auto _ : state) {
-		auto card_ests = Q3_4();
-		for (size_t i = 0; i < card_ests.size(); i++) {
-			state.counters["QErr" + std::to_string(i)] = card_ests[i];
-		}
-		state.counters["CardEst"] = card_ests.back() * 5;
-	}
-}
-
-BENCHMARK_F(SSBFixture, Query4_1)(::benchmark::State &state) {
-	for (auto _ : state) {
-		auto card_ests = Q4_1();
-		for (size_t i = 0; i < card_ests.size(); i++) {
-			state.counters["QErr" + std::to_string(i)] = card_ests[i];
-		}
-		state.counters["CardEst"] = card_ests.back() * 90353;
-	}
-}
-
-BENCHMARK_F(SSBFixture, Query4_2)(::benchmark::State &state) {
-	for (auto _ : state) {
-		auto card_ests = Q4_2();
-		for (size_t i = 0; i < card_ests.size(); i++) {
-			state.counters["QErr" + std::to_string(i)] = card_ests[i];
-		}
-		state.counters["CardEst"] = card_ests.back() * 21803;
-	}
-}
-
-BENCHMARK_F(SSBFixture, Query4_3)(::benchmark::State &state) {
-	for (auto _ : state) {
-		auto card_ests = Q4_3();
-		for (size_t i = 0; i < card_ests.size(); i++) {
-			state.counters["QErr" + std::to_string(i)] = card_ests[i];
-		}
-		state.counters["CardEst"] = card_ests.back() * 447;
-	}
-}
+BENCHMARK_REGISTER_F(SSBFixture, ExhaustiveCombination)->DenseRange(0, 12, 1);
 
 BENCHMARK_MAIN();

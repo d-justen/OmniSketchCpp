@@ -8,14 +8,13 @@ template <unsigned int WIDTH, unsigned int DEPTH, unsigned int SAMPLE_COUNT>
 class OmniSketchFixture : public benchmark::Fixture {
 public:
 	void SetUp(::benchmark::State &state) override {
-		omni_sketch =
-		    std::make_unique<omnisketch::OmniSketch<size_t, size_t, std::set<uint64_t>>>(WIDTH, DEPTH, SAMPLE_COUNT);
+		omni_sketch = std::make_shared<omnisketch::PointOmniSketch<size_t>>(WIDTH, DEPTH, SAMPLE_COUNT);
 	}
 
 	void FillOmniSketch(size_t value_count, size_t multiplicity,
-	                    omnisketch::OmniSketch<size_t, size_t, std::set<uint64_t>> *sketch = nullptr) {
+	                    omnisketch::PointOmniSketch<size_t> *sketch = nullptr) {
 		if (!sketch) {
-			sketch = &*omni_sketch;
+			sketch = omni_sketch.get();
 		}
 		const size_t rid_count = value_count * multiplicity;
 
@@ -28,5 +27,5 @@ public:
 		omni_sketch = nullptr;
 	}
 
-	std::unique_ptr<omnisketch::OmniSketch<size_t, size_t, std::set<uint64_t>>> omni_sketch;
+	std::shared_ptr<omnisketch::PointOmniSketch<size_t>> omni_sketch;
 };

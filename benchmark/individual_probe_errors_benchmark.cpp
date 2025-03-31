@@ -1,7 +1,7 @@
 #include <benchmark/benchmark.h>
-#include "algorithm/omni_sketch_operations.hpp"
-#include "algorithm/join_operations.hpp"
+#include "combinator.hpp"
 #include "omni_sketch.hpp"
+
 #include <random>
 
 static constexpr size_t SKETCH_WIDTH = 256;
@@ -31,8 +31,8 @@ public:
 			min_hash_sample_size = state.range(1);
 		}
 		if (!omni_sketch) {
-			omni_sketch = std::make_unique<omnisketch::OmniSketch<size_t, size_t, std::set<uint64_t>>>(
-			    SKETCH_WIDTH, SKETCH_DEPTH, min_hash_sample_size);
+			omni_sketch =
+			    std::make_shared<omnisketch::PointOmniSketch<size_t>>(SKETCH_WIDTH, SKETCH_DEPTH, min_hash_sample_size);
 			cardinalities = FillOmniSketch(*omni_sketch, IsUniform);
 			all_values.resize(attribute_count);
 			for (size_t val_idx = 1; val_idx < attribute_count + 1; val_idx++) {
@@ -41,8 +41,7 @@ public:
 		}
 	}
 
-	std::unordered_map<size_t, size_t>
-	FillOmniSketch(omnisketch::OmniSketch<size_t, size_t, std::set<uint64_t>> &sketch, bool uniform) {
+	std::unordered_map<size_t, size_t> FillOmniSketch(omnisketch::PointOmniSketch<size_t> &sketch, bool uniform) {
 		std::unordered_map<size_t, size_t> cards;
 		cards.reserve(attribute_count);
 		if (uniform) {
@@ -68,8 +67,8 @@ public:
 
 		for (auto _ : state) {
 			const size_t value = dist(gen);
-			const auto card = omni_sketch->EstimateCardinality(value);
-			state.counters["QError"] = ComputeQError(card.cardinality, cardinalities[value]);
+			const auto card = omni_sketch->Probe(value);
+			state.counters["QError"] = ComputeQError(card->RecordCount(), cardinalities[value]);
 		}
 	}
 
@@ -84,8 +83,8 @@ public:
 		}
 
 		for (auto _ : state) {
-			const auto card = omnisketch::Algorithm::DisjunctPointQueries(*omni_sketch, probe_set);
-			SetCounters(state, ComputeQError(card.cardinality, actual_card));
+			const auto card = omni_sketch->ProbeSet(probe_set.data(), probe_set.size());
+			SetCounters(state, ComputeQError(card->RecordCount(), actual_card));
 		}
 	}
 
@@ -98,21 +97,19 @@ public:
 		}
 
 		const size_t probe_sample_size = state.range(0);
-
-		omnisketch::CardEstResult<uint64_t> probe_sample;
-		probe_sample.min_hash_sketch.max_count = probe_sample_size;
-		probe_sample.cardinality = (double)JOIN_KEY_COUNT;
+		auto probe_sample = std::make_shared<omnisketch::OmniSketchCell>(probe_sample_size);
 		for (auto it = all_values.begin(); it != all_values.begin() + probe_sample_size; ++it) {
-			probe_sample.min_hash_sketch.hashes.insert(omnisketch::Hash(*it));
+			probe_sample->AddRecord(omnisketch::Hash(*it));
 		}
 
 		for (auto _ : state) {
 			if (use_approximate_join) {
-				const auto card = omnisketch::Algorithm::ApproximateJoin(*omni_sketch, probe_sample);
-				SetCounters(state, ComputeQError(card.cardinality, actual_card));
+				assert(false); // TODO: implement
 			} else {
-				const auto card = omnisketch::Algorithm::Join(*omni_sketch, probe_sample);
-				SetCounters(state, ComputeQError(card.cardinality, actual_card));
+				auto combinator = std::make_shared<omnisketch::ExhaustiveCombinator>();
+				combinator->AddPredicate(omni_sketch, probe_sample);
+				const auto card = combinator->Execute(omni_sketch->MinHashSketchSize());
+				SetCounters(state, ComputeQError(card->RecordCount(), actual_card));
 			}
 		}
 	}
@@ -132,7 +129,7 @@ public:
 
 	size_t attribute_count;
 	size_t min_hash_sample_size;
-	std::unique_ptr<omnisketch::OmniSketch<size_t, size_t, std::set<uint64_t>>> omni_sketch;
+	std::shared_ptr<omnisketch::PointOmniSketch<size_t>> omni_sketch;
 	std::vector<size_t> all_values;
 	std::unordered_map<size_t, size_t> cardinalities;
 	std::mt19937 gen;
@@ -154,13 +151,15 @@ BENCHMARK_TEMPLATE_DEFINE_F(ProbeErrorFixture, SetMembershipProbeErrorSkewed, fa
 	SetMembershipProbeSketch(state);
 }
 
+/*
 BENCHMARK_TEMPLATE_DEFINE_F(ProbeErrorFixture, ApproximateJoinErrorUniform, true)(benchmark::State &state) {
-	JoinSketch(state, true);
+    JoinSketch(state, true);
 }
 
 BENCHMARK_TEMPLATE_DEFINE_F(ProbeErrorFixture, ApproximateJoinErrorSkewed, false)(benchmark::State &state) {
-	JoinSketch(state, true);
+    JoinSketch(state, true);
 }
+*/
 
 BENCHMARK_TEMPLATE_DEFINE_F(ProbeErrorFixture, JoinErrorUniform, true)(benchmark::State &state) {
 	JoinSketch(state);
@@ -186,6 +185,7 @@ BENCHMARK_REGISTER_F(ProbeErrorFixture, SetMembershipProbeErrorSkewed)
     ->Iterations(ITERATION_COUNT)
     ->ArgsProduct({benchmark::CreateRange(1 << 3, 1 << 18, 2), {64, 1024}});
 
+/*
 BENCHMARK_REGISTER_F(ProbeErrorFixture, ApproximateJoinErrorUniform)
     ->Iterations(ITERATION_COUNT)
     ->ArgsProduct({benchmark::CreateRange(1 << 2, 1 << 14, 2), {1 << 16}, {64, 1024}});
@@ -193,6 +193,7 @@ BENCHMARK_REGISTER_F(ProbeErrorFixture, ApproximateJoinErrorUniform)
 BENCHMARK_REGISTER_F(ProbeErrorFixture, ApproximateJoinErrorSkewed)
     ->Iterations(ITERATION_COUNT)
     ->ArgsProduct({benchmark::CreateRange(1 << 2, 1 << 14, 2), {1 << 16}, {64, 1024}});
+*/
 
 BENCHMARK_REGISTER_F(ProbeErrorFixture, JoinErrorUniform)
     ->Iterations(ITERATION_COUNT)

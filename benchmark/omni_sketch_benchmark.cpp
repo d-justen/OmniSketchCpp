@@ -1,11 +1,10 @@
 #include "omni_sketch_fixture.hpp"
 
-#include "algorithm/omni_sketch_operations.hpp"
+#include "combinator.hpp"
 
 constexpr size_t WIDTH = 256;
 constexpr size_t DEPTH = 3;
 constexpr size_t BYTES_PER_UINT64_SAMPLE = sizeof(uint64_t) * WIDTH * DEPTH;
-constexpr size_t BYTES_PER_UINT32_SAMPLE = sizeof(uint32_t) * WIDTH * DEPTH;
 constexpr size_t BYTES_PER_MB = 1048576;
 constexpr size_t SAMPLE_COUNT = 64;
 constexpr size_t INSERT_COUNT = 1024;
@@ -25,66 +24,63 @@ BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, PointQuery, WIDTH, 3, 200)
 	const size_t multiplicity = 50;
 	FillOmniSketch(ATTRIBUTE_COUNT, multiplicity);
 
-	omnisketch::CardEstResult<uint64_t> card;
+	std::shared_ptr<omnisketch::OmniSketchCell> card;
 	for (auto _ : state) {
-		card = omni_sketch->EstimateCardinality(17);
+		card = omni_sketch->Probe(17);
 	}
 
-	state.counters["Q-Error"] = card.cardinality / multiplicity;
-	state.counters["OmniSketchSizeMB"] = omni_sketch->EstimateByteSize() / 1024.0 / 1024.0;
+	state.counters["Q-Error"] = (double)card->RecordCount() / multiplicity;
+	state.counters["OmniSketchSizeMB"] = (double)omni_sketch->EstimateByteSize() / 1024.0 / 1024.0;
 }
 
 BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, ConjunctPointQueries, WIDTH, DEPTH,
                             10 * BYTES_PER_MB / BYTES_PER_UINT64_SAMPLE)
 (::benchmark::State &state) {
 	FillOmniSketch(ATTRIBUTE_COUNT, 50);
-	auto omni_sketch_2 = std::make_unique<omnisketch::OmniSketch<size_t, size_t, std::set<uint64_t>>>(
+	auto omni_sketch_2 = std::make_shared<omnisketch::PointOmniSketch<size_t>>(
 	    WIDTH, DEPTH, 10 * BYTES_PER_MB / BYTES_PER_UINT64_SAMPLE);
 	FillOmniSketch(ATTRIBUTE_COUNT, 30, &*omni_sketch_2);
-	auto omni_sketch_3 = std::make_unique<omnisketch::OmniSketch<size_t, size_t, std::set<uint64_t>>>(
+	auto omni_sketch_3 = std::make_shared<omnisketch::PointOmniSketch<size_t>>(
 	    WIDTH, DEPTH, 10 * BYTES_PER_MB / BYTES_PER_UINT64_SAMPLE);
 	FillOmniSketch(ATTRIBUTE_COUNT, 20, &*omni_sketch_3);
 
-	std::vector<omnisketch::OmniSketch<size_t, size_t, std::set<uint64_t>> *> sketch_vec {
-	    &*omni_sketch, &*omni_sketch_2, &*omni_sketch_3};
-	std::vector<size_t> values {17, 17, 17};
-
-	omnisketch::CardEstResult<uint64_t> card;
+	std::shared_ptr<omnisketch::OmniSketchCell> card;
 	for (auto _ : state) {
-		card = omnisketch::Algorithm::ConjunctPointQueries(sketch_vec, values);
+		auto combinator = std::make_shared<omnisketch::ExhaustiveCombinator>();
+		combinator->AddPredicate(omni_sketch, omnisketch::PredicateConverter::ConvertPoint(17));
+		combinator->AddPredicate(omni_sketch_2, omnisketch::PredicateConverter::ConvertPoint(17));
+		combinator->AddPredicate(omni_sketch_3, omnisketch::PredicateConverter::ConvertPoint(17));
+		card = combinator->Execute(omni_sketch->MinHashSketchSize());
 	}
 
-	state.counters["Q-Error"] = card.cardinality / 20;
+	state.counters["Q-Error"] = (double)card->RecordCount() / 20.0;
 }
 
 BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, ConjunctPointQueriesFlattened, WIDTH, DEPTH,
                             10 * BYTES_PER_MB / BYTES_PER_UINT64_SAMPLE)
 (::benchmark::State &state) {
 	FillOmniSketch(ATTRIBUTE_COUNT, 50);
-	auto omni_sketch_2 = std::make_unique<omnisketch::OmniSketch<size_t, size_t, std::set<uint64_t>>>(
+	auto omni_sketch_2 = std::make_shared<omnisketch::PointOmniSketch<size_t>>(
 	    WIDTH, DEPTH, 10 * BYTES_PER_MB / BYTES_PER_UINT64_SAMPLE);
 	FillOmniSketch(ATTRIBUTE_COUNT, 30, &*omni_sketch_2);
-	auto omni_sketch_3 = std::make_unique<omnisketch::OmniSketch<size_t, size_t, std::set<uint64_t>>>(
+	auto omni_sketch_3 = std::make_shared<omnisketch::PointOmniSketch<size_t>>(
 	    WIDTH, DEPTH, 10 * BYTES_PER_MB / BYTES_PER_UINT64_SAMPLE);
 	FillOmniSketch(ATTRIBUTE_COUNT, 20, &*omni_sketch_3);
 
-	std::vector<omnisketch::OmniSketch<size_t, size_t, std::vector<uint64_t>>> flattened {
-	    omni_sketch->Flatten(), omni_sketch_2->Flatten(), omni_sketch_3->Flatten()};
-	omni_sketch = nullptr;
-	omni_sketch_2 = nullptr;
-	omni_sketch_3 = nullptr;
+	omni_sketch->Flatten();
+	omni_sketch_2->Flatten();
+	omni_sketch_3->Flatten();
 
-	std::vector<omnisketch::OmniSketch<size_t, size_t, std::vector<uint64_t>> *> sketch_vec {
-	    &flattened[0], &flattened[1], &flattened[2]};
-
-	std::vector<size_t> values {17, 17, 17};
-
-	omnisketch::CardEstResult<uint64_t> card;
+	std::shared_ptr<omnisketch::OmniSketchCell> card;
 	for (auto _ : state) {
-		card = omnisketch::Algorithm::ConjunctPointQueries(sketch_vec, values);
+		auto combinator = std::make_shared<omnisketch::ExhaustiveCombinator>();
+		combinator->AddPredicate(omni_sketch, omnisketch::PredicateConverter::ConvertPoint(17));
+		combinator->AddPredicate(omni_sketch_2, omnisketch::PredicateConverter::ConvertPoint(17));
+		combinator->AddPredicate(omni_sketch_3, omnisketch::PredicateConverter::ConvertPoint(17));
+		card = combinator->Execute(omni_sketch->MinHashSketchSize());
 	}
 
-	state.counters["Q-Error"] = card.cardinality / 20;
+	state.counters["Q-Error"] = (double)card->RecordCount() / 20.0;
 }
 
 BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, DisjunctPointQueries, WIDTH, DEPTH, SAMPLE_COUNT)
@@ -96,31 +92,35 @@ BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, DisjunctPointQueries, WIDTH, DEPT
 		values[i] = i + 1;
 	}
 
-	omnisketch::CardEstResult<uint64_t> card;
+	std::shared_ptr<omnisketch::OmniSketchCell> card;
 	for (auto _ : state) {
-		card = omnisketch::Algorithm::DisjunctPointQueries(*omni_sketch, values);
+		auto combinator = std::make_shared<omnisketch::ExhaustiveCombinator>();
+		combinator->AddPredicate(omni_sketch, omnisketch::PredicateConverter::ConvertSet(values));
+		card = combinator->Execute(omni_sketch->MinHashSketchSize());
 	}
 
-	state.counters["Q-Error"] = card.cardinality / (50 * state.range());
+	state.counters["Q-Error"] = (double)card->RecordCount() / (50.0 * (double)state.range());
 }
 
 BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, DisjunctPointQueriesFlattened, WIDTH, DEPTH,
                             10 * BYTES_PER_MB / BYTES_PER_UINT64_SAMPLE)
 (::benchmark::State &state) {
 	FillOmniSketch(ATTRIBUTE_COUNT, 50);
-	auto flattened_omni_sketch = omni_sketch->Flatten();
+	omni_sketch->Flatten();
 
 	std::vector<size_t> values(state.range());
 	for (size_t i = 0; i < state.range(); i++) {
 		values[i] = i + 1;
 	}
 
-	omnisketch::CardEstResult<uint64_t> card;
+	std::shared_ptr<omnisketch::OmniSketchCell> card;
 	for (auto _ : state) {
-		card = omnisketch::Algorithm::DisjunctPointQueries(flattened_omni_sketch, values);
+		auto combinator = std::make_shared<omnisketch::ExhaustiveCombinator>();
+		combinator->AddPredicate(omni_sketch, omnisketch::PredicateConverter::ConvertSet(values));
+		card = combinator->Execute(omni_sketch->MinHashSketchSize());
 	}
 
-	state.counters["Q-Error"] = card.cardinality / (50 * state.range());
+	state.counters["Q-Error"] = (double)card->RecordCount() / (50.0 * (double)state.range());
 }
 
 BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, SetMembership, WIDTH, DEPTH, SAMPLE_COUNT)
@@ -132,31 +132,36 @@ BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, SetMembership, WIDTH, DEPTH, SAMP
 		values[i] = i + 1;
 	}
 
-	omnisketch::CardEstResult<uint64_t> card;
+	std::shared_ptr<omnisketch::OmniSketchCell> card;
 	for (auto _ : state) {
-		card = omnisketch::Algorithm::SetMembership(*omni_sketch, values);
+		auto combinator = std::make_shared<omnisketch::ExhaustiveCombinator>();
+		combinator->AddPredicate(omni_sketch, omnisketch::PredicateConverter::ConvertSet(values));
+		card = combinator->Execute(omni_sketch->MinHashSketchSize());
 	}
 
-	state.counters["Q-Error"] = card.cardinality / (50 * state.range());
-	state.counters["OmniSketchSizeMB"] = omni_sketch->EstimateByteSize() / 1024.0 / 1024.0;
+	state.counters["Q-Error"] = (double)card->RecordCount() / (50.0 * (double)state.range());
+	state.counters["OmniSketchSizeMB"] = (double)omni_sketch->EstimateByteSize() / 1024.0 / 1024.0;
 }
 
 BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, SetMembershipFlattened, WIDTH, DEPTH, SAMPLE_COUNT)
 (::benchmark::State &state) {
 	FillOmniSketch(ATTRIBUTE_COUNT, 50);
-	auto flattened_omni_sketch = omni_sketch->Flatten();
+	omni_sketch->Flatten();
 
 	std::vector<size_t> values(state.range());
 	for (size_t i = 0; i < state.range(); i++) {
 		values[i] = i + 1;
 	}
 
-	omnisketch::CardEstResult<uint64_t> card;
+	std::shared_ptr<omnisketch::OmniSketchCell> card;
 	for (auto _ : state) {
-		card = omnisketch::Algorithm::SetMembership(flattened_omni_sketch, values);
+		auto combinator = std::make_shared<omnisketch::ExhaustiveCombinator>();
+		combinator->AddPredicate(omni_sketch, omnisketch::PredicateConverter::ConvertSet(values));
+		card = combinator->Execute(omni_sketch->MinHashSketchSize());
 	}
 
-	state.counters["Q-Error"] = card.cardinality / (50 * state.range());
+	state.counters["Q-Error"] = (double)card->RecordCount() / (50.0 * (double)state.range());
+	state.counters["OmniSketchSizeMB"] = (double)omni_sketch->EstimateByteSize() / 1024.0 / 1024.0;
 }
 
 BENCHMARK_REGISTER_F(OmniSketchFixture, AddRecords);

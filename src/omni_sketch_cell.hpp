@@ -8,64 +8,31 @@
 
 namespace omnisketch {
 
-template <typename ContainerType>
+enum class CellType { SET, VECTOR };
+
 class OmniSketchCell {
 public:
-	OmniSketchCell() : record_count(0) {
-	}
+	OmniSketchCell(std::shared_ptr<MinHashSketch> min_hash_sketch_p, size_t record_count_p);
+	explicit OmniSketchCell(std::shared_ptr<MinHashSketch> min_hash_sketch_p);
+	explicit OmniSketchCell(size_t max_sample_count);
+	OmniSketchCell();
 
-	explicit OmniSketchCell(size_t max_count_p)
-	    : min_hash_sketch(MinHashSketch<ContainerType>(max_count_p)), record_count(0) {
-	}
-
-	void AddRecord(typename ContainerType::value_type hash) {
-		min_hash_sketch.AddRecord(hash);
-		record_count++;
-	}
-
-	inline size_t RecordCount() const {
-		return record_count;
-	}
-
-	inline size_t SampleCount() const {
-		return min_hash_sketch.Size();
-	}
-
-	inline size_t MaxSampleCount() const {
-		return min_hash_sketch.max_count;
-	}
-
-	void Combine(const OmniSketchCell &other, size_t max_sample_size) {
-		record_count += other.record_count;
-		min_hash_sketch.Union(other.min_hash_sketch);
-	}
-
-	const MinHashSketch<ContainerType> &GetMinHashSketch() const {
-		return min_hash_sketch;
-	}
-
-	MinHashSketch<ContainerType> &GetMinHashSketch() {
-		return min_hash_sketch;
-	}
-
-	OmniSketchCell<std::vector<typename ContainerType::value_type>> Flatten() {
-		OmniSketchCell<std::vector<typename ContainerType::value_type>> result;
-		result.SetRecordCount(record_count);
-		result.SetMinHashSketch(min_hash_sketch.Flatten());
-		return result;
-	}
-
-	void SetRecordCount(size_t count) {
-		record_count = count;
-	}
-
-	void SetMinHashSketch(MinHashSketch<ContainerType> sketch) {
-		min_hash_sketch = std::move(sketch);
-	}
+	void AddRecord(uint64_t hash);
+	size_t RecordCount() const;
+	size_t SampleCount() const;
+	size_t MaxSampleCount() const;
+	void Combine(const OmniSketchCell &other);
+	const std::shared_ptr<MinHashSketch> &GetMinHashSketch() const;
+	std::shared_ptr<MinHashSketch> &GetMinHashSketch();
+	std::shared_ptr<OmniSketchCell> Flatten();
+	void SetRecordCount(size_t count);
+	void SetMinHashSketch(std::shared_ptr<MinHashSketch> sketch);
+	size_t EstimateByteSize() const;
+	static std::shared_ptr<OmniSketchCell> Intersect(const std::vector<std::shared_ptr<OmniSketchCell>> &cells);
 
 protected:
 	size_t record_count;
-	MinHashSketch<ContainerType> min_hash_sketch;
+	std::shared_ptr<MinHashSketch> min_hash_sketch;
 };
 
 } // namespace omnisketch

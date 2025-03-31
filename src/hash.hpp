@@ -9,7 +9,6 @@
 namespace omnisketch {
 
 // From https://nullprogram.com/blog/2018/07/31/
-
 inline uint64_t MurmurHash64(uint64_t x) {
 	x ^= x >> 32;
 	x *= 0xd6e8feb86659fd93U;
@@ -55,5 +54,41 @@ inline uint64_t Hash(const std::string &value) {
 }
 
 // TODO: Implement other types
+
+class HashProcessor {
+public:
+	virtual size_t ComputeCellIdx(uint64_t hash, size_t row_idx) = 0;
+};
+
+class BasicSplitHashProcessor : public HashProcessor {
+public:
+	explicit BasicSplitHashProcessor(size_t width_p) : width(width_p) {
+	}
+
+	size_t ComputeCellIdx(uint64_t hash, size_t row_idx) override {
+		uint32_t h1 = hash;
+		uint32_t h2 = hash >> 32;
+		return (h1 + row_idx * h2) % width;
+	}
+
+private:
+	size_t width;
+};
+
+class BarrettModSplitHashProcessor : public HashProcessor {
+public:
+	explicit BarrettModSplitHashProcessor(size_t width_p) : width(width_p) {
+	}
+
+	size_t ComputeCellIdx(uint64_t hash, size_t row_idx) override {
+		uint32_t h1 = hash;
+		uint32_t h2 = hash >> 32;
+		uint32_t combined = h1 + (uint32_t)std::pow(row_idx + 1, 2) * h2;
+		return BarrettReduction(combined) % width;
+	}
+
+private:
+	size_t width;
+};
 
 } // namespace omnisketch
