@@ -14,17 +14,18 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
 endif()
 
 set(SOURCE_FILES
-        src/include/set_membership.hpp
-
-        src/combinator.cpp
         src/include/combinator.hpp
         src/include/hash.hpp
-        src/min_hash_sketch.cpp
         src/include/min_hash_sketch.hpp
         src/include/omni_sketch.hpp
         src/include/omni_sketch.tpp
-        src/omni_sketch_cell.cpp
         src/include/omni_sketch_cell.hpp
+        src/include/set_membership.hpp
+
+        src/combinator.cpp
+        src/hash.cpp
+        src/min_hash_sketch.cpp
+        src/omni_sketch_cell.cpp
 )
 
 add_library(omnisketch STATIC ${SOURCE_FILES})
