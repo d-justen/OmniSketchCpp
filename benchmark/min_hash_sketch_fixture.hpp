@@ -10,15 +10,16 @@ public:
 		const size_t sketch_count = state.range();
 
 		sketches = std::vector<std::shared_ptr<omnisketch::MinHashSketch>>(sketch_count);
+		auto hf = std::make_shared<omnisketch::MurmurHashFunction<size_t>>();
 
 		for (size_t i = 0; i < sketch_count; i++) {
 			sketches[i] = std::make_shared<omnisketch::MinHashSketchSet>(MaxSampleSize);
 			for (size_t j = 0; j < MatchCount; j++) {
-				const uint64_t hash = omnisketch::Hash(j);
+				const uint64_t hash = hf->HashRid(j);
 				sketches[i]->AddRecord(hash);
 			}
 			for (size_t j = MatchCount; j < MaxSampleSize; j++) {
-				const uint64_t hash = omnisketch::Hash(i * MaxSampleSize + j);
+				const uint64_t hash = hf->HashRid(i * MaxSampleSize + j);
 				sketches[i]->AddRecord(hash);
 			}
 		}

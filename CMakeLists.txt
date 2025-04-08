@@ -18,13 +18,13 @@ set(SOURCE_FILES
         src/include/hash.hpp
         src/include/min_hash_sketch.hpp
         src/include/omni_sketch.hpp
-        src/include/omni_sketch.tpp
         src/include/omni_sketch_cell.hpp
         src/include/set_membership.hpp
+        src/include/value.hpp
 
         src/combinator.cpp
-        src/hash.cpp
         src/min_hash_sketch.cpp
+        src/omni_sketch.cpp
         src/omni_sketch_cell.cpp
 )
 

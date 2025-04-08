@@ -31,8 +31,8 @@ public:
 			min_hash_sample_size = state.range(1);
 		}
 		if (!omni_sketch) {
-			omni_sketch =
-			    std::make_shared<omnisketch::PointOmniSketch<size_t>>(SKETCH_WIDTH, SKETCH_DEPTH, min_hash_sample_size);
+			omni_sketch = std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(SKETCH_WIDTH, SKETCH_DEPTH,
+			                                                                         min_hash_sample_size);
 			cardinalities = FillOmniSketch(*omni_sketch, IsUniform);
 			all_values.resize(attribute_count);
 			for (size_t val_idx = 1; val_idx < attribute_count + 1; val_idx++) {
@@ -41,7 +41,7 @@ public:
 		}
 	}
 
-	std::unordered_map<size_t, size_t> FillOmniSketch(omnisketch::PointOmniSketch<size_t> &sketch, bool uniform) {
+	std::unordered_map<size_t, size_t> FillOmniSketch(omnisketch::TypedPointOmniSketch<size_t> &sketch, bool uniform) {
 		std::unordered_map<size_t, size_t> cards;
 		cards.reserve(attribute_count);
 		if (uniform) {
@@ -98,8 +98,9 @@ public:
 
 		const size_t probe_sample_size = state.range(0);
 		auto probe_sample = std::make_shared<omnisketch::OmniSketchCell>(probe_sample_size);
+		auto hf = std::make_shared<omnisketch::MurmurHashFunction<size_t>>();
 		for (auto it = all_values.begin(); it != all_values.begin() + probe_sample_size; ++it) {
-			probe_sample->AddRecord(omnisketch::Hash(*it));
+			probe_sample->AddRecord(hf->HashRid(*it));
 		}
 		probe_sample->SetRecordCount(JOIN_KEY_COUNT);
 
@@ -109,7 +110,7 @@ public:
 			} else {
 				auto combinator = std::make_shared<omnisketch::ExhaustiveCombinator>();
 				combinator->AddPredicate(omni_sketch, probe_sample);
-				const auto card = combinator->Execute(omni_sketch->MinHashSketchSize());
+				const auto card = combinator->ComputeResult(omni_sketch->MinHashSketchSize());
 				SetCounters(state, ComputeQError(card->RecordCount(), actual_card));
 			}
 		}
@@ -130,7 +131,7 @@ public:
 
 	size_t attribute_count;
 	size_t min_hash_sample_size;
-	std::shared_ptr<omnisketch::PointOmniSketch<size_t>> omni_sketch;
+	std::shared_ptr<omnisketch::TypedPointOmniSketch<size_t>> omni_sketch;
 	std::vector<size_t> all_values;
 	std::unordered_map<size_t, size_t> cardinalities;
 	std::mt19937 gen;

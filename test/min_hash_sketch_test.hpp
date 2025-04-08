@@ -15,19 +15,20 @@ protected:
 		a = std::make_shared<T>(SKETCH_SIZE);
 		b = std::make_shared<T>(SKETCH_SIZE);
 		c = std::make_shared<T>(SKETCH_SIZE);
+		hf = std::make_shared<omnisketch::MurmurHashFunction<size_t>>();
 	}
 
 	void FillSketches() {
 		for (size_t i = 0; i < MATCH_COUNT; i++) {
-			auto hash = omnisketch::Hash(i);
+			auto hash = hf->HashRid(i);
 			a->AddRecord(hash);
 			b->AddRecord(hash);
 			c->AddRecord(hash);
 		}
 		for (size_t i = MATCH_COUNT; i < SKETCH_SIZE; i++) {
-			auto hash_1 = omnisketch::Hash(i);
+			auto hash_1 = hf->HashRid(i);
 			a->AddRecord(hash_1);
-			auto hash_2 = omnisketch::Hash(SKETCH_SIZE + i);
+			auto hash_2 = hf->HashRid(SKETCH_SIZE + i);
 			b->AddRecord(i % 2 == 0 ? hash_1 : hash_2);
 			c->AddRecord(hash_2);
 		}
@@ -49,4 +50,5 @@ protected:
 	std::shared_ptr<omnisketch::MinHashSketch> a;
 	std::shared_ptr<omnisketch::MinHashSketch> b;
 	std::shared_ptr<omnisketch::MinHashSketch> c;
+	std::shared_ptr<omnisketch::HashFunction<size_t>> hf;
 };

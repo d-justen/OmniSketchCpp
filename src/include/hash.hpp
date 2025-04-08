@@ -8,6 +8,8 @@
 
 namespace omnisketch {
 
+namespace hash_functions {
+
 // From https://nullprogram.com/blog/2018/07/31/
 inline uint64_t MurmurHash64(uint64_t x) {
 	x ^= x >> 32;
@@ -35,32 +37,110 @@ inline uint64_t Hash(const std::string &value) {
 	return string_hasher(value);
 }
 
+} // namespace hash_functions
+
 // TODO: Implement other types
-
-class HashProcessor {
+template <typename T>
+class HashFunction {
 public:
-	virtual size_t ComputeCellIdx(uint64_t hash, size_t row_idx) = 0;
+	virtual uint64_t Hash(const T &value) const = 0;
+	virtual uint64_t HashRid(uint64_t rid) const = 0;
 };
 
-class BasicSplitHashProcessor : public HashProcessor {
+template <typename T>
+class MurmurHashFunction : public HashFunction<T> {
 public:
-	explicit BasicSplitHashProcessor(size_t width_p);
-	size_t ComputeCellIdx(uint64_t hash, size_t row_idx) override;
+	uint64_t Hash(const T &value) const override {
+		return hash_functions::Hash(value);
+	}
 
-private:
-	size_t width;
+	uint64_t HashRid(uint64_t rid) const override {
+		return hash_functions::MurmurHash64(rid);
+	}
 };
 
-class BarrettModSplitHashProcessor : public HashProcessor {
+template <typename T>
+class IdentityHashFunction : public HashFunction<T> {
 public:
-	explicit BarrettModSplitHashProcessor(size_t width_p);
-	size_t ComputeCellIdx(uint64_t hash, size_t row_idx) override;
+	uint64_t Hash(const T &value) const override {
+		return static_cast<uint64_t>(value);
+	}
+	uint64_t HashRid(uint64_t rid) const override {
+		return rid;
+	}
+};
 
-private:
-	static uint32_t BarrettReduction(uint32_t x);
-
-private:
+class CellIdxMapper {
+public:
+	virtual ~CellIdxMapper() = default;
+	CellIdxMapper(size_t width_p) : width(width_p), h1(0), h2(0) {
+	}
+	virtual void SetHash(uint64_t hash) = 0;
+	virtual size_t ComputeCellIdx(size_t row_idx) = 0;
 	size_t width;
+	uint32_t h1;
+	uint32_t h2;
+};
+
+class BasicSplitHashMapper : public CellIdxMapper {
+public:
+	explicit BasicSplitHashMapper(size_t width_p) : CellIdxMapper(width_p) {
+	}
+
+	void SetHash(uint64_t hash) override {
+		h1 = hash;
+		h2 = hash >> 32;
+	}
+
+	size_t ComputeCellIdx(size_t row_idx) override {
+		return (h1 + row_idx * h2) % width;
+	}
+};
+
+class BarrettModSplitHashMapper : public CellIdxMapper {
+public:
+	explicit BarrettModSplitHashMapper(size_t width_p) : CellIdxMapper(width_p) {
+	}
+
+	void SetHash(uint64_t hash) override {
+		h1 = hash;
+		h2 = hash >> 32;
+	}
+
+	size_t ComputeCellIdx(size_t row_idx) override {
+		uint32_t combined = h1 + (uint32_t)std::pow(row_idx + 1, 2) * h2;
+		return BarrettReduction(combined) % width;
+	}
+
+protected:
+	static uint32_t BarrettReduction(uint32_t x) {
+		static constexpr uint32_t prime = (1 << 19) - 1; // largest prime in uint32_t
+		static constexpr uint64_t mu = UINT64_MAX / prime;
+
+		uint32_t q = ((uint64_t)x * mu) >> 32;
+		uint32_t remainder = x - q * prime;
+		if (remainder >= prime) {
+			remainder -= prime;
+		}
+
+		return remainder;
+	}
+};
+
+class IdentitySplitMapper : public CellIdxMapper {
+public:
+	explicit IdentitySplitMapper(size_t width_p) : CellIdxMapper(width_p) {
+	}
+
+	void SetHash(uint64_t value) override {
+		uint64_t hash = hash_functions::Hash(value);
+		h1 = hash;
+		h2 = hash >> 32;
+	}
+
+	size_t ComputeCellIdx(size_t row_idx) override {
+		return (h1 + row_idx * h2) % width;
+	}
 };
 
 } // namespace omnisketch

@@ -7,11 +7,25 @@
 #include <sstream>
 
 using namespace omnisketch;
-using IntOmniSketch = PointOmniSketch<size_t>;
-using StringOmniSketch = PointOmniSketch<std::string>;
+using IntOmniSketch = TypedPointOmniSketch<size_t>;
+using StringOmniSketch = TypedPointOmniSketch<std::string>;
 static constexpr size_t OUTPUT_SIZE = 1024;
 
-enum class SSBQuery : uint64_t { Q1_1, Q1_2, Q1_3, Q2_1, Q2_2, Q2_3, Q3_1, Q3_2, Q3_3, Q3_4, Q4_1, Q4_2, Q4_3 };
+enum class SSBQuery : int64_t {
+	Q1_1 = 11,
+	Q1_2 = 12,
+	Q1_3 = 13,
+	Q2_1 = 21,
+	Q2_2 = 22,
+	Q2_3 = 23,
+	Q3_1 = 31,
+	Q3_2 = 32,
+	Q3_3 = 33,
+	Q3_4 = 34,
+	Q4_1 = 41,
+	Q4_2 = 42,
+	Q4_3 = 43
+};
 
 size_t GetCardinality(SSBQuery q) {
 	switch (q) {
@@ -75,12 +89,12 @@ public:
 
 private:
 	SketchesSingleton() {
-		lo_discount = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
-		lo_quantity = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
-		lo_orderdate = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
-		lo_partkey = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
-		lo_custkey = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
-		lo_suppkey = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
+		lo_discount = std::make_shared<IntOmniSketch>(512, 3, 1 << 11);
+		lo_quantity = std::make_shared<IntOmniSketch>(512, 3, 1 << 11);
+		lo_orderdate = std::make_shared<IntOmniSketch>(512, 3, 1 << 11);
+		lo_partkey = std::make_shared<IntOmniSketch>(512, 3, 1 << 11);
+		lo_custkey = std::make_shared<IntOmniSketch>(512, 3, 1 << 11);
+		lo_suppkey = std::make_shared<IntOmniSketch>(512, 3, 1 << 11);
 
 		d_year = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
 		d_yearmonthnum = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
@@ -237,7 +251,8 @@ public:
 		combinator->AddPredicate(lo_orderdate, d_year->Probe(1993));
 		combinator->AddPredicate(lo_discount, PredicateConverter::ConvertRange(1, 3));
 		combinator->AddPredicate(lo_quantity, PredicateConverter::ConvertRange(1, 25));
-		return combinator->Execute(OUTPUT_SIZE);
+
+		return combinator->ComputeResult(OUTPUT_SIZE);
 	}
 
 	template <typename CombinatorType>
@@ -246,7 +261,8 @@ public:
 		combinator->AddPredicate(lo_orderdate, d_yearmonthnum->Probe(199401));
 		combinator->AddPredicate(lo_discount, PredicateConverter::ConvertRange(4, 6));
 		combinator->AddPredicate(lo_quantity, PredicateConverter::ConvertRange(26, 35));
-		return combinator->Execute(OUTPUT_SIZE);
+
+		return combinator->ComputeResult(OUTPUT_SIZE);
 	}
 
 	template <typename CombinatorType>
@@ -256,10 +272,11 @@ public:
 		date_combinator->AddPredicate(d_weeknuminyear, PredicateConverter::ConvertPoint(6));
 
 		auto combinator = std::make_unique<CombinatorType>();
-		combinator->AddPredicate(lo_orderdate, date_combinator->Execute(OUTPUT_SIZE));
+		combinator->AddPredicate(lo_orderdate, date_combinator->ComputeResult(OUTPUT_SIZE));
 		combinator->AddPredicate(lo_discount, PredicateConverter::ConvertRange(5, 7));
 		combinator->AddPredicate(lo_quantity, PredicateConverter::ConvertRange(36, 40));
-		return combinator->Execute(OUTPUT_SIZE);
+
+		return combinator->ComputeResult(OUTPUT_SIZE);
 	}
 
 	template <typename CombinatorType>
@@ -267,7 +284,9 @@ public:
 		auto combinator = std::make_unique<CombinatorType>();
 		combinator->AddPredicate(lo_partkey, p_category->Probe("MFGR#12"));
 		combinator->AddPredicate(lo_suppkey, s_region->Probe("AMERICA"));
-		return combinator->Execute(OUTPUT_SIZE);
+		combinator->AddPredicate(lo_orderdate, d_year->GetRids());
+
+		return combinator->ComputeResult(OUTPUT_SIZE);
 	}
 
 	template <typename CombinatorType>
@@ -277,7 +296,9 @@ public:
 		                                    "MFGR#2225", "MFGR#2226", "MFGR#2227", "MFGR#2228"};
 		combinator->AddPredicate(lo_partkey, p_brand->ProbeSet(probe_set.data(), probe_set.size()));
 		combinator->AddPredicate(lo_suppkey, s_region->Probe("ASIA"));
-		return combinator->Execute(OUTPUT_SIZE);
+		combinator->AddPredicate(lo_orderdate, d_year->GetRids());
+
+		return combinator->ComputeResult(OUTPUT_SIZE);
 	}
 
 	template <typename CombinatorType>
@@ -285,7 +306,9 @@ public:
 		auto combinator = std::make_unique<CombinatorType>();
 		combinator->AddPredicate(lo_partkey, p_brand->Probe("MFGR#2339"));
 		combinator->AddPredicate(lo_suppkey, s_region->Probe("EUROPE"));
-		return combinator->Execute(OUTPUT_SIZE);
+		combinator->AddPredicate(lo_orderdate, d_year->GetRids());
+
+		return combinator->ComputeResult(OUTPUT_SIZE);
 	}
 
 	template <typename CombinatorType>
@@ -294,7 +317,8 @@ public:
 		combinator->AddPredicate(lo_custkey, c_region->Probe("ASIA"));
 		combinator->AddPredicate(lo_suppkey, s_region->Probe("ASIA"));
 		combinator->AddPredicate(lo_orderdate, d_year->ProbeRange(1992, 1997));
-		return combinator->Execute(OUTPUT_SIZE);
+
+		return combinator->ComputeResult(OUTPUT_SIZE);
 	}
 
 	template <typename CombinatorType>
@@ -303,7 +327,8 @@ public:
 		combinator->AddPredicate(lo_custkey, c_nation->Probe("UNITED STATES"));
 		combinator->AddPredicate(lo_suppkey, s_nation->Probe("UNITED STATES"));
 		combinator->AddPredicate(lo_orderdate, d_year->ProbeRange(1992, 1997));
-		return combinator->Execute(OUTPUT_SIZE);
+
+		return combinator->ComputeResult(OUTPUT_SIZE);
 	}
 
 	template <typename CombinatorType>
@@ -313,7 +338,8 @@ public:
 		combinator->AddPredicate(lo_custkey, c_city->ProbeSet(probe_set.data(), probe_set.size()));
 		combinator->AddPredicate(lo_suppkey, s_city->ProbeSet(probe_set.data(), probe_set.size()));
 		combinator->AddPredicate(lo_orderdate, d_year->ProbeRange(1992, 1997));
-		return combinator->Execute(OUTPUT_SIZE);
+
+		return combinator->ComputeResult(OUTPUT_SIZE);
 	}
 
 	template <typename CombinatorType>
@@ -323,7 +349,8 @@ public:
 		combinator->AddPredicate(lo_custkey, c_city->ProbeSet(probe_set.data(), probe_set.size()));
 		combinator->AddPredicate(lo_suppkey, s_city->ProbeSet(probe_set.data(), probe_set.size()));
 		combinator->AddPredicate(lo_orderdate, d_yearmonth->Probe("Dec1997"));
-		return combinator->Execute(OUTPUT_SIZE);
+
+		return combinator->ComputeResult(OUTPUT_SIZE);
 	}
 
 	template <typename CombinatorType>
@@ -333,7 +360,9 @@ public:
 		combinator->AddPredicate(lo_suppkey, s_region->Probe("AMERICA"));
 		std::vector<std::string> probe_set {"MFGR#1", "MFGR#2"};
 		combinator->AddPredicate(lo_partkey, p_mfgr->ProbeSet(probe_set.data(), probe_set.size()));
-		return combinator->Execute(OUTPUT_SIZE);
+		combinator->AddPredicate(lo_orderdate, d_year->GetRids());
+
+		return combinator->ComputeResult(OUTPUT_SIZE);
 	}
 
 	template <typename CombinatorType>
@@ -344,7 +373,8 @@ public:
 		std::vector<std::string> probe_set {"MFGR#1", "MFGR#2"};
 		combinator->AddPredicate(lo_partkey, p_mfgr->ProbeSet(probe_set.data(), probe_set.size()));
 		combinator->AddPredicate(lo_orderdate, d_year->ProbeRange(1997, 1998));
-		return combinator->Execute(OUTPUT_SIZE);
+
+		return combinator->ComputeResult(OUTPUT_SIZE);
 	}
 
 	template <typename CombinatorType>
@@ -354,7 +384,8 @@ public:
 		combinator->AddPredicate(lo_suppkey, s_nation->Probe("UNITED STATES"));
 		combinator->AddPredicate(lo_partkey, p_category->Probe("MFGR#14"));
 		combinator->AddPredicate(lo_orderdate, d_year->ProbeRange(1997, 1998));
-		return combinator->Execute(OUTPUT_SIZE);
+
+		return combinator->ComputeResult(OUTPUT_SIZE);
 	}
 
 protected:
@@ -379,6 +410,8 @@ protected:
 	std::shared_ptr<StringOmniSketch> c_city;
 };
 
+static const std::vector<int64_t> query_idxs {11, 12, 13, 21, 22, 23, 31, 32, 33, 34, 41, 42, 43};
+
 BENCHMARK_DEFINE_F(SSBFixture, UncorrelatedCombination)(::benchmark::State &state) {
 	auto query = static_cast<SSBQuery>(state.range());
 	for (auto _ : state) {
@@ -389,7 +422,7 @@ BENCHMARK_DEFINE_F(SSBFixture, UncorrelatedCombination)(::benchmark::State &stat
 	}
 }
 
-BENCHMARK_REGISTER_F(SSBFixture, UncorrelatedCombination)->DenseRange(0, 12, 1);
+BENCHMARK_REGISTER_F(SSBFixture, UncorrelatedCombination)->ArgsProduct({query_idxs});
 
 BENCHMARK_DEFINE_F(SSBFixture, ExhaustiveCombination)(::benchmark::State &state) {
 	auto query = static_cast<SSBQuery>(state.range());
@@ -401,6 +434,6 @@ BENCHMARK_DEFINE_F(SSBFixture, ExhaustiveCombination)(::benchmark::State &state)
 	}
 }
 
-BENCHMARK_REGISTER_F(SSBFixture, ExhaustiveCombination)->DenseRange(0, 12, 1);
+BENCHMARK_REGISTER_F(SSBFixture, ExhaustiveCombination)->ArgsProduct({query_idxs});
 
 BENCHMARK_MAIN();

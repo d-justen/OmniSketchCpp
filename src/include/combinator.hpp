@@ -1,6 +1,7 @@
 #pragma once
 
 #include "omni_sketch.hpp"
+#include "value.hpp"
 
 namespace omnisketch {
 
@@ -9,7 +10,7 @@ public:
 	template <typename T>
 	static std::shared_ptr<OmniSketchCell> ConvertPoint(const T &value) {
 		auto result = std::make_shared<OmniSketchCell>(1);
-		result->AddRecord(Hash(value));
+		result->AddRecord(Value::From(value).GetHash());
 		return result;
 	}
 
@@ -17,7 +18,7 @@ public:
 	static std::shared_ptr<OmniSketchCell> ConvertSet(const std::vector<T> &values) {
 		auto result = std::make_shared<OmniSketchCell>(values.size());
 		for (auto &value : values) {
-			result->AddRecord(Hash(value));
+			result->AddRecord(Value::From(value).GetHash());
 		}
 		return result;
 	}
@@ -36,9 +37,12 @@ public:
 
 class OmniSketchCombinator {
 public:
-	virtual void AddPredicate(std::shared_ptr<OmniSketchBase> omni_sketch,
+	virtual void AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,
 	                          std::shared_ptr<OmniSketchCell> probe_sample) = 0;
-	virtual std::shared_ptr<OmniSketchCell> Execute(size_t max_output_size) const = 0;
+	virtual void AddUnfilteredRids(std::shared_ptr<OmniSketch> omni_sketch) = 0;
+	virtual std::shared_ptr<OmniSketchCell> ComputeResult(size_t max_output_size) const = 0;
+	virtual std::shared_ptr<OmniSketchCell> FilterProbeSet(std::shared_ptr<OmniSketch> omni_sketch,
+	                                                       std::shared_ptr<OmniSketchCell> probe_sample) const = 0;
 };
 
 struct ExhaustiveCombinatorItem {
@@ -60,29 +64,37 @@ struct ExhaustiveCombinatorItem {
 
 class ExhaustiveCombinator : public OmniSketchCombinator {
 public:
-	void AddPredicate(std::shared_ptr<OmniSketchBase> omni_sketch,
-	                  std::shared_ptr<OmniSketchCell> probe_sample) override;
-	std::shared_ptr<OmniSketchCell> Execute(size_t max_output_size) const override;
+	void AddPredicate(std::shared_ptr<OmniSketch> omni_sketch, std::shared_ptr<OmniSketchCell> probe_sample) override;
+	void AddUnfilteredRids(std::shared_ptr<OmniSketch> omni_sketch) override;
+	std::shared_ptr<OmniSketchCell> ComputeResult(size_t max_output_size) const override;
+	std::shared_ptr<OmniSketchCell> FilterProbeSet(std::shared_ptr<OmniSketch> omni_sketch,
+	                                               std::shared_ptr<OmniSketchCell> probe_sample) const override;
 
 protected:
-	std::vector<std::pair<std::shared_ptr<OmniSketchBase>, std::shared_ptr<OmniSketchCell>>> joins;
+	std::vector<std::vector<ExhaustiveCombinatorItem>> join_key_matches;
+	std::vector<double> sampling_probabilities;
+	std::vector<double> join_sels;
 	size_t max_sample_count;
-	double sampling_probability = 1;
+	size_t base_card;
 
 protected:
 	void FindMatchesInNextJoin(const std::vector<std::vector<ExhaustiveCombinatorItem>> &join_key_matches,
 	                           const std::shared_ptr<OmniSketchCell> &current, size_t join_idx, size_t current_n_max,
-	                           std::shared_ptr<OmniSketchCell> &result) const;
+	                           std::vector<double> &match_counts, std::shared_ptr<OmniSketchCell> &result) const;
 };
 
 class UncorrelatedCombinator : public OmniSketchCombinator {
 public:
-	void AddPredicate(std::shared_ptr<OmniSketchBase> omni_sketch,
-	                  std::shared_ptr<OmniSketchCell> probe_sample) override;
-	std::shared_ptr<OmniSketchCell> Execute(size_t max_output_size) const override;
+	void AddPredicate(std::shared_ptr<OmniSketch> omni_sketch, std::shared_ptr<OmniSketchCell> probe_sample) override;
+	void AddUnfilteredRids(std::shared_ptr<OmniSketch> omni_sketch) override;
+	std::shared_ptr<OmniSketchCell> ComputeResult(size_t max_output_size) const override;
+	std::shared_ptr<OmniSketchCell> FilterProbeSet(std::shared_ptr<OmniSketch> omni_sketch,
+	                                               std::shared_ptr<OmniSketchCell> probe_sample) const override;
 
 protected:
-	std::vector<std::pair<std::shared_ptr<OmniSketchBase>, std::shared_ptr<OmniSketchCell>>> joins;
+	std::vector<std::pair<std::shared_ptr<OmniSketch>, std::shared_ptr<OmniSketchCell>>> joins;
+	std::vector<std::shared_ptr<MinHashSketch>> join_results;
+	double query_selectivity = 1;
 	size_t base_card;
 };
 

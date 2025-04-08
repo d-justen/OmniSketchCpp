@@ -12,9 +12,9 @@ class CombinatorTestFixture : public testing::Test {
 protected:
 	CombinatorTestFixture() {
 		combinator = std::make_unique<T>();
-		sketch_1 = std::make_shared<omnisketch::PointOmniSketch<int>>(WIDTH, DEPTH, SAMPLE_COUNT);
-		sketch_2 = std::make_shared<omnisketch::PointOmniSketch<int>>(WIDTH, DEPTH, SAMPLE_COUNT);
-		sketch_3 = std::make_shared<omnisketch::PointOmniSketch<int>>(WIDTH, DEPTH, SAMPLE_COUNT);
+		sketch_1 = std::make_shared<omnisketch::TypedPointOmniSketch<int>>(WIDTH, DEPTH, SAMPLE_COUNT);
+		sketch_2 = std::make_shared<omnisketch::TypedPointOmniSketch<int>>(WIDTH, DEPTH, SAMPLE_COUNT);
+		sketch_3 = std::make_shared<omnisketch::TypedPointOmniSketch<int>>(WIDTH, DEPTH, SAMPLE_COUNT);
 		FillSketches();
 		CreateProbeResults();
 	}
@@ -33,28 +33,29 @@ protected:
 	}
 
 	void CreateProbeResults() {
+		auto hf = std::make_shared<omnisketch::MurmurHashFunction<size_t>>();
 		auto probe_set_1 = std::make_shared<omnisketch::MinHashSketchSet>(8);
-		probe_set_1->AddRecord(omnisketch::Hash(3));
+		probe_set_1->AddRecord(hf->Hash(3));
 		probe_result_1 = std::make_shared<omnisketch::OmniSketchCell>(probe_set_1, 1);
 
 		auto probe_set_2 = std::make_shared<omnisketch::MinHashSketchSet>(8);
-		probe_set_2->AddRecord(omnisketch::Hash(3));
-		probe_set_2->AddRecord(omnisketch::Hash(4));
-		probe_set_2->AddRecord(omnisketch::Hash(5));
+		probe_set_2->AddRecord(hf->Hash(3));
+		probe_set_2->AddRecord(hf->Hash(4));
+		probe_set_2->AddRecord(hf->Hash(5));
 		probe_result_2 = std::make_shared<omnisketch::OmniSketchCell>(probe_set_2, 6);
 
 		auto probe_set_3 = std::make_shared<omnisketch::MinHashSketchSet>(8);
 		for (size_t i = 3; i < 16 + 3; i++) {
-			probe_set_3->AddRecord(omnisketch::Hash(i));
+			probe_set_3->AddRecord(hf->Hash(i));
 		}
 
 		probe_result_3 = std::make_shared<omnisketch::OmniSketchCell>(probe_set_3, 16);
 	}
 
 	std::unique_ptr<T> combinator;
-	std::shared_ptr<omnisketch::OmniSketch<int>> sketch_1;
-	std::shared_ptr<omnisketch::OmniSketch<int>> sketch_2;
-	std::shared_ptr<omnisketch::OmniSketch<int>> sketch_3;
+	std::shared_ptr<omnisketch::TypedPointOmniSketch<int>> sketch_1;
+	std::shared_ptr<omnisketch::TypedPointOmniSketch<int>> sketch_2;
+	std::shared_ptr<omnisketch::TypedPointOmniSketch<int>> sketch_3;
 
 	std::shared_ptr<omnisketch::OmniSketchCell> probe_result_1;
 	std::shared_ptr<omnisketch::OmniSketchCell> probe_result_2;

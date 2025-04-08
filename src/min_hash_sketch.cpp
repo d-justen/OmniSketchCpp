@@ -161,8 +161,9 @@ MinHashSketchSet::Combine(const std::vector<std::shared_ptr<MinHashSketch>> &oth
 
 	while (active_sketch_count > 0) {
 		size_t active_count_next_round = 0;
-		for (size_t sketch_idx = 0; sketch_idx < active_sketch_count; sketch_idx++) {
-			auto &current_sketch_it = sketch_iterators[active_sketch_idxs[sketch_idx]];
+		for (size_t active_sketch_idx = 0; active_sketch_idx < active_sketch_count; active_sketch_idx++) {
+			const size_t current_sketch_idx = active_sketch_idxs[active_sketch_idx];
+			auto &current_sketch_it = sketch_iterators[current_sketch_idx];
 			if (!current_sketch_it->HasNext()) {
 				continue;
 			}
@@ -170,7 +171,7 @@ MinHashSketchSet::Combine(const std::vector<std::shared_ptr<MinHashSketch>> &oth
 			auto next_hash = current_sketch_it->Next();
 			if (result->Data().size() < result->max_count) {
 				result->Data().insert(next_hash);
-				active_sketch_idxs[active_count_next_round++] = sketch_idx;
+				active_sketch_idxs[active_count_next_round++] = current_sketch_idx;
 				continue;
 			}
 			if (next_hash < *result->Data().crbegin()) {
@@ -178,7 +179,7 @@ MinHashSketchSet::Combine(const std::vector<std::shared_ptr<MinHashSketch>> &oth
 				if (result->Data().size() > result->max_count) {
 					result->Data().erase(std::prev(result->Data().cend()));
 				}
-				active_sketch_idxs[active_count_next_round++] = sketch_idx;
+				active_sketch_idxs[active_count_next_round++] = active_sketch_idx;
 			}
 		}
 		active_sketch_count = active_count_next_round;

@@ -72,21 +72,41 @@ std::shared_ptr<OmniSketchCell> OmniSketchCell::Intersect(const std::vector<std:
 	sketches.reserve(cells.size());
 
 	size_t n_max = 0;
+	size_t n_min = UINT64_MAX;
 	size_t sample_count = 0;
 	for (const auto &cell : cells) {
 		if (cell->RecordCount() > n_max) {
 			n_max = cell->RecordCount();
 			sample_count = cell->SampleCount();
 		}
-		n_max = std::max(n_max, cell->record_count);
+		n_max = std::max(n_max, cell->RecordCount());
+		n_min = std::min(n_min, cell->RecordCount());
 		sketches.push_back(cell->GetMinHashSketch());
 	}
 
 	auto result = std::make_shared<OmniSketchCell>(sketches.front()->Intersect(sketches));
-	const double card_est = (double)n_max / (double)sample_count * (double)result->SampleCount();
+	const double card_est =
+	    std::min((double)n_min, (double)n_max / (double)sample_count * (double)result->SampleCount());
 	result->SetRecordCount((size_t)std::round(card_est));
 
 	return result;
+}
+
+std::shared_ptr<OmniSketchCell> OmniSketchCell::Combine(const std::vector<std::shared_ptr<OmniSketchCell>> &cells) {
+	assert(!cells.empty());
+	std::vector<std::shared_ptr<MinHashSketch>> sketches;
+	sketches.reserve(cells.size());
+	size_t combined_card = 0;
+	for (const auto &cell : cells) {
+		sketches.push_back(cell->GetMinHashSketch());
+		combined_card += cell->RecordCount();
+	}
+	auto result = std::make_shared<OmniSketchCell>(sketches.front()->Combine(sketches));
+	result->SetRecordCount(combined_card);
+	return result;
+}
+double OmniSketchCell::SamplingProbability() const {
+	return (double)min_hash_sketch->Size() / (double)record_count;
 }
 
 } // namespace omnisketch

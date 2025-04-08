@@ -13,7 +13,7 @@ TEST_F(MinHashSketchSet, Intersection) {
 	EXPECT_EQ(result->Size(), MATCH_COUNT);
 	auto *typed_result = dynamic_cast<omnisketch::MinHashSketchSet *>(result.get());
 	for (size_t i = 0; i < MATCH_COUNT; i++) {
-		uint64_t hash = omnisketch::Hash(i);
+		uint64_t hash = hf->HashRid(i);
 		EXPECT_NE(typed_result->Data().find(hash), typed_result->Data().end());
 	}
 }
@@ -27,7 +27,7 @@ TEST_F(MinHashSketchSet, Flatten) {
 	auto *typed_flattened = dynamic_cast<omnisketch::MinHashSketchVector *>(flattened.get());
 
 	for (size_t i = 0; i < a->Size(); i++) {
-		uint64_t hash = omnisketch::Hash(i);
+		uint64_t hash = hf->HashRid(i);
 		EXPECT_NE(typed_a->Data().find(hash), typed_a->Data().end());
 		if (i < a->Size() - 1) {
 			EXPECT_LT(typed_flattened->Data()[i], typed_flattened->Data()[i + 1]);
@@ -44,7 +44,7 @@ TEST_F(MinHashSketchSet, FlattenIntersection) {
 	EXPECT_EQ(result->Size(), MATCH_COUNT);
 	auto *typed_result = dynamic_cast<omnisketch::MinHashSketchSet *>(result.get());
 	for (size_t i = 0; i < MATCH_COUNT; i++) {
-		uint64_t hash = omnisketch::Hash(i);
+		uint64_t hash = hf->HashRid(i);
 		EXPECT_NE(typed_result->Data().find(hash), typed_result->Data().end());
 	}
 }
@@ -56,7 +56,7 @@ TEST_F(MinHashSketchVec, Intersection) {
 	EXPECT_EQ(result->Size(), MATCH_COUNT);
 	auto *typed_result = dynamic_cast<omnisketch::MinHashSketchSet *>(result.get());
 	for (size_t i = 0; i < MATCH_COUNT; i++) {
-		uint64_t hash = omnisketch::Hash(i);
+		uint64_t hash = hf->HashRid(i);
 		EXPECT_NE(typed_result->Data().find(hash), typed_result->Data().end());
 	}
 }

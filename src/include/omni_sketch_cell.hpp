@@ -21,6 +21,7 @@ public:
 	size_t RecordCount() const;
 	size_t SampleCount() const;
 	size_t MaxSampleCount() const;
+	double SamplingProbability() const;
 	void Combine(const OmniSketchCell &other);
 	const std::shared_ptr<MinHashSketch> &GetMinHashSketch() const;
 	std::shared_ptr<MinHashSketch> &GetMinHashSketch();
@@ -29,6 +30,7 @@ public:
 	void SetMinHashSketch(std::shared_ptr<MinHashSketch> sketch);
 	size_t EstimateByteSize() const;
 	static std::shared_ptr<OmniSketchCell> Intersect(const std::vector<std::shared_ptr<OmniSketchCell>> &cells);
+	static std::shared_ptr<OmniSketchCell> Combine(const std::vector<std::shared_ptr<OmniSketchCell>> &cells);
 
 protected:
 	size_t record_count;

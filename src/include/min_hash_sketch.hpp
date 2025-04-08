@@ -96,6 +96,9 @@ public:
 	};
 
 public:
+	explicit MinHashSketchVector(std::vector<uint64_t> data_p) : data(std::move(data_p)), max_count(data.size()) {
+	}
+
 	explicit MinHashSketchVector(size_t max_count_p) : max_count(max_count_p) {
 		data.reserve(max_count);
 	}
