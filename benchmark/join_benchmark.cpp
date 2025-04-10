@@ -158,7 +158,7 @@ public:
 	template <typename CombinatorType>
 	double Q1_3() {
 		PlanGenerator gen(std::make_shared<CombinatorType>());
-		gen.AddPredicate("date", "d_yearmonthnum", PredicateConverter::ConvertPoint(199401));
+		gen.AddPredicate("date", "d_year", PredicateConverter::ConvertPoint(1994));
 		gen.AddPredicate("date", "d_weeknuminyear", PredicateConverter::ConvertPoint(6));
 		gen.AddJoin("lineorder", "lo_orderdate", "date");
 		gen.AddPredicate("lineorder", "lo_discount", PredicateConverter::ConvertRange(5, 7));

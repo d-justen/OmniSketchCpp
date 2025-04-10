@@ -26,9 +26,10 @@ public:
 
 	static void ReadFile(const std::string &path, const std::string &table_name,
 	                     const std::vector<std::string> &column_names, std::vector<ColumnType> types,
-	                     const OmniSketchConfig config = OmniSketchConfig(), bool create_rids = false, size_t column_offset = 0) {
+	                     const OmniSketchConfig config = OmniSketchConfig(), bool create_rids = false,
+	                     size_t column_offset = 0) {
 		std::vector<OmniSketchConfig> configs(column_names.size(), config);
-		ReadFile(path, table_name, column_names, types, configs, create_rids);
+		ReadFile(path, table_name, column_names, types, configs, create_rids, column_offset);
 	}
 
 	static void ReadFile(const std::string &path, const std::string &table_name,

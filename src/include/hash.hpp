@@ -73,10 +73,15 @@ public:
 class CellIdxMapper {
 public:
 	virtual ~CellIdxMapper() = default;
-	CellIdxMapper(size_t width_p) : width(width_p), h1(0), h2(0) {
+	explicit CellIdxMapper(size_t width_p) : width(width_p), h1(0), h2(0) {
 	}
 	virtual void SetHash(uint64_t hash) = 0;
 	virtual size_t ComputeCellIdx(size_t row_idx) = 0;
+	size_t Width() const {
+		return width;
+	}
+
+protected:
 	size_t width;
 	uint32_t h1;
 	uint32_t h2;

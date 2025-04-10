@@ -13,6 +13,7 @@ namespace omnisketch {
 
 class OmniSketch {
 public:
+	virtual ~OmniSketch() = default;
 	virtual size_t RecordCount() const = 0;
 	virtual std::shared_ptr<OmniSketchCell> ProbeHash(uint64_t hash,
 	                                                  std::vector<std::shared_ptr<OmniSketchCell>> &matches) const = 0;
@@ -35,6 +36,7 @@ public:
 
 class PointOmniSketch : public OmniSketch {
 public:
+	virtual ~PointOmniSketch() = default;
 	PointOmniSketch(size_t width_p, size_t depth_p, std::shared_ptr<MinHashSketchFactory> min_hash_sketch_factory_p,
 	                std::shared_ptr<SetMembershipAlgorithm> set_membership_algo_p,
 	                std::shared_ptr<CellIdxMapper> hash_processor_p);

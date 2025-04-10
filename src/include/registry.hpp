@@ -9,12 +9,12 @@ namespace omnisketch {
 struct OmniSketchConfig {
 	void SetWidth(size_t width_p) {
 		width = width_p;
-		hash_processor->width = width_p;
+		hash_processor = std::make_shared<BarrettModSplitHashMapper>(width);
 	}
 
 	void SetSampleCount(size_t sample_count_p) {
 		sample_count = sample_count_p;
-		min_hash_sketch_factory->SetMaxSampleCount(sample_count_p);
+		min_hash_sketch_factory = std::make_shared<MinHashSketchSetFactory>(sample_count);
 	}
 
 	size_t width = 256;
@@ -33,33 +33,37 @@ public:
 	static Registry &Get();
 
 	template <class T>
-	std::shared_ptr<TypedPointOmniSketch<T>> CreateOmniSketch(const std::string &table_name, const std::string &column_name,
-	                      const OmniSketchConfig &config = OmniSketchConfig {}) {
-		auto sketch = std::make_shared<TypedPointOmniSketch<T>>(
+	std::shared_ptr<TypedPointOmniSketch<T>> CreateOmniSketch(const std::string &table_name,
+	                                                          const std::string &column_name,
+	                                                          const OmniSketchConfig &config = OmniSketchConfig {}) {
+		assert(sketches.find(table_name) == sketches.end() ||
+		       sketches[table_name].find(column_name) == sketches[table_name].end());
+		std::shared_ptr<PointOmniSketch> sketch = std::make_shared<TypedPointOmniSketch<T>>(
 		    config.width, config.depth, std::make_shared<MurmurHashFunction<T>>(), config.min_hash_sketch_factory,
 		    config.set_membership_algo, config.hash_processor);
 		sketches[table_name][column_name] = sketch;
-		return sketch;
+		sketch_vec.push_back(sketch);
+		return std::dynamic_pointer_cast<TypedPointOmniSketch<T>>(sketch);
 	}
 
 	template <class T>
 	std::shared_ptr<TypedPointOmniSketch<T>> GetOmniSketchTyped(const std::string &table_name,
-	                                                       const std::string &column_name) {
+	                                                            const std::string &column_name) {
 		return std::dynamic_pointer_cast<TypedPointOmniSketch<T>>(sketches[table_name][column_name]);
 	}
 
-	std::shared_ptr<PointOmniSketch> GetOmniSketch(const std::string &table_name,
-	                                                            const std::string &column_name) {
+	std::shared_ptr<PointOmniSketch> GetOmniSketch(const std::string &table_name, const std::string &column_name) {
 		return sketches[table_name][column_name];
 	}
 
-	std::shared_ptr<OmniSketchCell> ProduceRidSample(const std::string& table_name) {
+	std::shared_ptr<OmniSketchCell> ProduceRidSample(const std::string &table_name) {
 		return sketches[table_name].begin()->second->GetRids();
 	}
 
 private:
 	Registry();
 	std::unordered_map<std::string, std::unordered_map<std::string, std::shared_ptr<PointOmniSketch>>> sketches;
+	std::vector<std::shared_ptr<PointOmniSketch>> sketch_vec;
 };
 
 } // namespace omnisketch

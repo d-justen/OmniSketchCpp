@@ -3,7 +3,7 @@
 namespace omnisketch {
 
 void PlanGenerator::AddPredicate(const std::string &table_name, const std::string &column_name,
-                                 const std::shared_ptr<OmniSketchCell>& probe_set) {
+                                 const std::shared_ptr<OmniSketchCell> &probe_set) {
 	auto &registry = Registry::Get();
 	auto item = GetOrCreatePlanItem(table_name);
 	auto sketch = registry.GetOmniSketch(table_name, column_name);
@@ -36,10 +36,10 @@ bool CheckIfResolvable(const std::shared_ptr<PlanItem> &item) {
 }
 
 double PlanGenerator::EstimateCardinality() {
-	auto& registry = Registry::Get();
+	auto &registry = Registry::Get();
 	std::unordered_set<std::shared_ptr<PlanItem>> left_over;
 	for (auto &plan_item_pair : plan_items) {
-		auto& combinator = plan_item_pair.second->combinator;
+		auto &combinator = plan_item_pair.second->combinator;
 		if (!combinator->HasPredicates() && plan_item_pair.second->probed_from.empty()) {
 			// This relation is not filtered by any predicates or previous joins
 			combinator->AddUnfilteredRids(registry.ProduceRidSample(plan_item_pair.first));
@@ -67,7 +67,12 @@ double PlanGenerator::EstimateCardinality() {
 				auto &fk_side_item = fk_side_item_pair.first;
 				auto &fk_sketch = fk_side_item_pair.second;
 
-				fk_side_item->combinator->AddPredicate(fk_sketch, plan_item->combinator->ComputeResult(UINT64_MAX));
+				auto pk_probe_set = plan_item->combinator->ComputeResult(UINT64_MAX);
+				if (pk_probe_set->RecordCount() == 0) {
+					return 0;
+				}
+
+				fk_side_item->combinator->AddPredicate(fk_sketch, pk_probe_set);
 				fk_side_item->probed_from.erase(plan_item);
 				continue;
 			}
@@ -76,6 +81,10 @@ double PlanGenerator::EstimateCardinality() {
 				std::shared_ptr<PlanItem> item_to_probe_into = nullptr;
 				std::shared_ptr<PointOmniSketch> sketch_to_probe_into = nullptr;
 				auto pk_probe_set = plan_item->combinator->ComputeResult(UINT64_MAX);
+				if (pk_probe_set->RecordCount() == 0) {
+					return 0;
+				}
+
 				for (auto &fk_side_item_pair : plan_item->probes_into) {
 					auto &fk_side_item = fk_side_item_pair.first;
 					auto &fk_omni_sketch = fk_side_item_pair.second;

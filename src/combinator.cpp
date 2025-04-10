@@ -70,8 +70,6 @@ std::shared_ptr<OmniSketchCell> ExhaustiveCombinator::ComputeResult(size_t max_o
 		FindMatchesInNextJoin(join_key_matches, join_key_match.cell->GetMinHashSketch(), 1, join_key_match.n_max,
 		                      match_counts, result);
 	}
-	std::vector<double> relative_selectivities;
-	relative_selectivities.reserve(match_counts.size());
 
 	auto result_card = (double)base_card;
 	for (size_t predicate_idx = 0; predicate_idx < match_counts.size(); predicate_idx++) {

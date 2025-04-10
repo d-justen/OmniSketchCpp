@@ -3,9 +3,9 @@
 namespace omnisketch {
 
 PointOmniSketch::PointOmniSketch(size_t width_p, size_t depth_p,
-                                    std::shared_ptr<MinHashSketchFactory> min_hash_sketch_factory_p,
-                                    std::shared_ptr<SetMembershipAlgorithm> set_membership_algo_p,
-                                    std::shared_ptr<CellIdxMapper> hash_processor_p)
+                                 std::shared_ptr<MinHashSketchFactory> min_hash_sketch_factory_p,
+                                 std::shared_ptr<SetMembershipAlgorithm> set_membership_algo_p,
+                                 std::shared_ptr<CellIdxMapper> hash_processor_p)
     : width(width_p), depth(depth_p), min_hash_sketch_factory(std::move(min_hash_sketch_factory_p)),
       set_membership_algo(std::move(set_membership_algo_p)), hash_processor(std::move(hash_processor_p)) {
 	cells.resize(depth);
@@ -32,7 +32,6 @@ size_t PointOmniSketch::RecordCount() const {
 	return record_count;
 }
 
-
 std::shared_ptr<OmniSketchCell> PointOmniSketch::Probe(const Value &value) const {
 	std::vector<std::shared_ptr<OmniSketchCell>> matches(depth);
 
@@ -42,6 +41,7 @@ std::shared_ptr<OmniSketchCell> PointOmniSketch::Probe(const Value &value) const
 std::shared_ptr<OmniSketchCell>
 PointOmniSketch::ProbeHash(uint64_t hash, std::vector<std::shared_ptr<OmniSketchCell>> &matches) const {
 	assert(matches.size() == depth);
+	assert(width == hash_processor->Width());
 	hash_processor->SetHash(hash);
 	for (size_t row_idx = 0; row_idx < depth; row_idx++) {
 		const size_t col_idx = hash_processor->ComputeCellIdx(row_idx);
@@ -72,8 +72,8 @@ std::shared_ptr<OmniSketchCell> PointOmniSketch::ProbeSet(const std::shared_ptr<
 	return ProbeSet(values->GetMinHashSketch());
 }
 
-std::shared_ptr<OmniSketchCell> PointOmniSketch::ProbeSet(const ValueSet& values) const {
-	const auto& hashes = values.GetHashes();
+std::shared_ptr<OmniSketchCell> PointOmniSketch::ProbeSet(const ValueSet &values) const {
+	const auto &hashes = values.GetHashes();
 	std::vector<std::vector<std::shared_ptr<OmniSketchCell>>> matches(
 	    hashes.size(), std::vector<std::shared_ptr<OmniSketchCell>>(depth));
 
