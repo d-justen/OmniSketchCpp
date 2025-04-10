@@ -127,6 +127,7 @@ class MinHashSketchFactory {
 public:
 	virtual std::shared_ptr<MinHashSketch> Create() const = 0;
 	virtual size_t MaxSampleCount() const = 0;
+	virtual void SetMaxSampleCount(size_t max_count_p) = 0;
 };
 
 class MinHashSketchSetFactory : public MinHashSketchFactory {
@@ -140,6 +141,10 @@ public:
 
 	size_t MaxSampleCount() const override {
 		return max_count;
+	}
+
+	void SetMaxSampleCount(size_t max_count_p) override {
+		max_count = max_count_p;
 	}
 
 private:
@@ -157,6 +162,10 @@ public:
 
 	size_t MaxSampleCount() const override {
 		return max_count;
+	}
+
+	void SetMaxSampleCount(size_t max_count_p) override {
+		max_count = max_count_p;
 	}
 
 private:

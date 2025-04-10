@@ -40,6 +40,8 @@ public:
 	virtual void AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,
 	                          std::shared_ptr<OmniSketchCell> probe_sample) = 0;
 	virtual void AddUnfilteredRids(std::shared_ptr<OmniSketch> omni_sketch) = 0;
+	virtual void AddUnfilteredRids(std::shared_ptr<OmniSketchCell> rid_sample) = 0;
+	virtual bool HasPredicates() const = 0;
 	virtual std::shared_ptr<OmniSketchCell> ComputeResult(size_t max_output_size) const = 0;
 	virtual std::shared_ptr<OmniSketchCell> FilterProbeSet(std::shared_ptr<OmniSketch> omni_sketch,
 	                                                       std::shared_ptr<OmniSketchCell> probe_sample) const = 0;
@@ -66,6 +68,8 @@ class ExhaustiveCombinator : public OmniSketchCombinator {
 public:
 	void AddPredicate(std::shared_ptr<OmniSketch> omni_sketch, std::shared_ptr<OmniSketchCell> probe_sample) override;
 	void AddUnfilteredRids(std::shared_ptr<OmniSketch> omni_sketch) override;
+	void AddUnfilteredRids(std::shared_ptr<OmniSketchCell> rid_sample) override;
+	bool HasPredicates() const override;
 	std::shared_ptr<OmniSketchCell> ComputeResult(size_t max_output_size) const override;
 	std::shared_ptr<OmniSketchCell> FilterProbeSet(std::shared_ptr<OmniSketch> omni_sketch,
 	                                               std::shared_ptr<OmniSketchCell> probe_sample) const override;
@@ -79,7 +83,7 @@ protected:
 
 protected:
 	void FindMatchesInNextJoin(const std::vector<std::vector<ExhaustiveCombinatorItem>> &join_key_matches,
-	                           const std::shared_ptr<OmniSketchCell> &current, size_t join_idx, size_t current_n_max,
+	                           const std::shared_ptr<MinHashSketch> &current, size_t join_idx, size_t current_n_max,
 	                           std::vector<double> &match_counts, std::shared_ptr<OmniSketchCell> &result) const;
 };
 
@@ -87,6 +91,8 @@ class UncorrelatedCombinator : public OmniSketchCombinator {
 public:
 	void AddPredicate(std::shared_ptr<OmniSketch> omni_sketch, std::shared_ptr<OmniSketchCell> probe_sample) override;
 	void AddUnfilteredRids(std::shared_ptr<OmniSketch> omni_sketch) override;
+	void AddUnfilteredRids(std::shared_ptr<OmniSketchCell> rid_sample) override;
+	bool HasPredicates() const override;
 	std::shared_ptr<OmniSketchCell> ComputeResult(size_t max_output_size) const override;
 	std::shared_ptr<OmniSketchCell> FilterProbeSet(std::shared_ptr<OmniSketch> omni_sketch,
 	                                               std::shared_ptr<OmniSketchCell> probe_sample) const override;

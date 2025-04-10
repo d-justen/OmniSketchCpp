@@ -1,10 +1,8 @@
 #include <benchmark/benchmark.h>
 
 #include "include/combinator.hpp"
-
-#include <iostream>
-#include <fstream>
-#include <sstream>
+#include "include/csv_importer.hpp"
+#include "include/plan_generator.hpp"
 
 using namespace omnisketch;
 using IntOmniSketch = TypedPointOmniSketch<size_t>;
@@ -67,154 +65,44 @@ public:
 		return instance;
 	}
 
-	std::shared_ptr<IntOmniSketch> lo_discount;
-	std::shared_ptr<IntOmniSketch> lo_quantity;
-	std::shared_ptr<IntOmniSketch> lo_orderdate;
-	std::shared_ptr<IntOmniSketch> lo_partkey;
-	std::shared_ptr<IntOmniSketch> lo_custkey;
-	std::shared_ptr<IntOmniSketch> lo_suppkey;
-	std::shared_ptr<IntOmniSketch> d_year;
-	std::shared_ptr<IntOmniSketch> d_yearmonthnum;
-	std::shared_ptr<IntOmniSketch> d_weeknuminyear;
-	std::shared_ptr<StringOmniSketch> d_yearmonth;
-	std::shared_ptr<StringOmniSketch> p_category;
-	std::shared_ptr<StringOmniSketch> p_brand;
-	std::shared_ptr<StringOmniSketch> p_mfgr;
-	std::shared_ptr<StringOmniSketch> s_region;
-	std::shared_ptr<StringOmniSketch> s_nation;
-	std::shared_ptr<StringOmniSketch> s_city;
-	std::shared_ptr<StringOmniSketch> c_region;
-	std::shared_ptr<StringOmniSketch> c_nation;
-	std::shared_ptr<StringOmniSketch> c_city;
-
 private:
 	SketchesSingleton() {
-		lo_discount = std::make_shared<IntOmniSketch>(512, 3, 1 << 11);
-		lo_quantity = std::make_shared<IntOmniSketch>(512, 3, 1 << 11);
-		lo_orderdate = std::make_shared<IntOmniSketch>(512, 3, 1 << 11);
-		lo_partkey = std::make_shared<IntOmniSketch>(512, 3, 1 << 11);
-		lo_custkey = std::make_shared<IntOmniSketch>(512, 3, 1 << 11);
-		lo_suppkey = std::make_shared<IntOmniSketch>(512, 3, 1 << 11);
+		OmniSketchConfig config;
+		config.SetWidth(512);
+		config.SetSampleCount(1 << 11);
 
-		d_year = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
-		d_yearmonthnum = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
-		d_weeknuminyear = std::make_shared<IntOmniSketch>(256, 3, 1 << 10);
-		d_yearmonth = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
+		CSVImporter::ReadFile("../data/lineorder_f.csv", "lineorder",
+		                      {"lo_discount", "lo_quantity", "lo_orderdate", "lo_partkey", "lo_custkey", "lo_suppkey"},
+		                      std::vector<ColumnType>(6, ColumnType::UINT), config, true, 1);
 
-		p_category = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
-		p_brand = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
-		p_mfgr = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
+		config.SetWidth(256);
+		config.SetSampleCount(1 << 10);
 
-		s_region = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
-		s_nation = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
-		s_city = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
+		CSVImporter::ReadFile(
+		    "../data/date_f.csv", "date", {"d_datekey", "d_year", "d_yearmonthnum", "d_weeknuminyear", "d_yearmonth"},
+		    {ColumnType::UINT, ColumnType::UINT, ColumnType::UINT, ColumnType::UINT, ColumnType::VARCHAR}, config);
 
-		c_region = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
-		c_nation = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
-		c_city = std::make_shared<StringOmniSketch>(256, 3, 1 << 10);
+		CSVImporter::ReadFile("../data/part_f.csv", "part", {"p_partkey", "p_category", "p_brand", "p_mfgr"},
+		                      {ColumnType::UINT, ColumnType::VARCHAR, ColumnType::VARCHAR, ColumnType::VARCHAR},
+		                      config);
 
-		std::cout << "Loading lineorder table..." << std::endl;
-		std::ifstream lineorder("../data/lineorder_f.csv");
-		std::string line;
-		size_t lineorder_id = 0;
-		while (std::getline(lineorder, line)) {
-			auto tokens = Split(line);
-			size_t id = ++lineorder_id;
+		CSVImporter::ReadFile("../data/supplier_f.csv", "supplier", {"s_suppkey", "s_region", "s_nation", "s_city"},
+		                      {ColumnType::UINT, ColumnType::VARCHAR, ColumnType::VARCHAR, ColumnType::VARCHAR},
+		                      config);
 
-			lo_discount->AddRecord(std::stoul(tokens[1]), id);
-			lo_quantity->AddRecord(std::stoul(tokens[2]), id);
-			lo_orderdate->AddRecord(std::stoul(tokens[3]), id);
-			lo_partkey->AddRecord(std::stoul(tokens[4]), id);
-			lo_custkey->AddRecord(std::stoul(tokens[5]), id);
-			lo_suppkey->AddRecord(std::stoul(tokens[6]), id);
-		}
-		lineorder.close();
-
-		std::cout << "Loading date table..." << std::endl;
-		std::ifstream date("../data/date_f.csv");
-		while (std::getline(date, line)) {
-			auto tokens = Split(line);
-			size_t id = std::stoul(tokens[0]);
-			d_year->AddRecord(std::stoul(tokens[1]), id);
-			d_yearmonthnum->AddRecord(std::stoul(tokens[2]), id);
-			d_weeknuminyear->AddRecord(std::stoul(tokens[3]), id);
-			d_yearmonth->AddRecord(tokens[4], id);
-		}
-		date.close();
-
-		std::cout << "Loading part table..." << std::endl;
-		std::ifstream part("../data/part_f.csv");
-		while (std::getline(part, line)) {
-			auto tokens = Split(line);
-			size_t id = std::stoul(tokens[0]);
-			p_category->AddRecord(tokens[1], id);
-			p_brand->AddRecord(tokens[2], id);
-			p_mfgr->AddRecord(tokens[3], id);
-		}
-		part.close();
-
-		std::cout << "Loading supplier table..." << std::endl;
-		std::ifstream supplier("../data/supplier_f.csv");
-		while (std::getline(supplier, line)) {
-			auto tokens = Split(line);
-			size_t id = std::stoul(tokens[0]);
-			s_region->AddRecord(tokens[1], id);
-			s_nation->AddRecord(tokens[2], id);
-			s_city->AddRecord(tokens[3], id);
-		}
-		supplier.close();
-
-		std::cout << "Loading customer table..." << std::endl;
-		std::ifstream customer("../data/customer_f.csv");
-		while (std::getline(customer, line)) {
-			auto tokens = Split(line);
-			size_t id = std::stoul(tokens[0]);
-			c_region->AddRecord(tokens[1], id);
-			c_nation->AddRecord(tokens[2], id);
-			c_city->AddRecord(tokens[3], id);
-		}
-	}
-
-	static std::vector<std::string> Split(const std::string &line) {
-		std::vector<std::string> tokens;
-		std::stringstream ss(line);
-		std::string token;
-
-		while (std::getline(ss, token, ',')) {
-			tokens.push_back(token);
-		}
-
-		return tokens;
+		CSVImporter::ReadFile("../data/customer_f.csv", "customer", {"c_custkey", "c_region", "c_nation", "c_city"},
+		                      {ColumnType::UINT, ColumnType::VARCHAR, ColumnType::VARCHAR, ColumnType::VARCHAR},
+		                      config);
 	}
 };
 
 class SSBFixture : public benchmark::Fixture {
 public:
-	SSBFixture() {
-		auto &sketches = SketchesSingleton::GetInstance();
-		lo_discount = sketches.lo_discount;
-		lo_quantity = sketches.lo_quantity;
-		lo_orderdate = sketches.lo_orderdate;
-		lo_partkey = sketches.lo_partkey;
-		lo_custkey = sketches.lo_custkey;
-		lo_suppkey = sketches.lo_suppkey;
-		d_year = sketches.d_year;
-		d_yearmonthnum = sketches.d_yearmonthnum;
-		d_weeknuminyear = sketches.d_weeknuminyear;
-		d_yearmonth = sketches.d_yearmonth;
-		p_category = sketches.p_category;
-		p_brand = sketches.p_brand;
-		p_mfgr = sketches.p_mfgr;
-		s_region = sketches.s_region;
-		s_nation = sketches.s_nation;
-		s_city = sketches.s_city;
-		c_region = sketches.c_region;
-		c_nation = sketches.c_nation;
-		c_city = sketches.c_city;
+	SSBFixture() : singleton(SketchesSingleton::GetInstance()) {
 	}
 
 	template <typename CombinatorType>
-	std::shared_ptr<OmniSketchCell> ExecuteQuery(SSBQuery q) {
+	double ExecuteQuery(SSBQuery q) {
 		switch (q) {
 		case SSBQuery::Q1_1:
 			return Q1_1<CombinatorType>();
@@ -246,168 +134,180 @@ public:
 	}
 
 	template <typename CombinatorType>
-	std::shared_ptr<OmniSketchCell> Q1_1() {
-		auto combinator = std::make_unique<CombinatorType>();
-		combinator->AddPredicate(lo_orderdate, d_year->Probe(1993));
-		combinator->AddPredicate(lo_discount, PredicateConverter::ConvertRange(1, 3));
-		combinator->AddPredicate(lo_quantity, PredicateConverter::ConvertRange(1, 25));
+	double Q1_1() {
+		PlanGenerator gen(std::make_shared<CombinatorType>());
+		gen.AddPredicate("date", "d_year", PredicateConverter::ConvertPoint(1993));
+		gen.AddJoin("lineorder", "lo_orderdate", "date");
+		gen.AddPredicate("lineorder", "lo_discount", PredicateConverter::ConvertRange(1, 3));
+		gen.AddPredicate("lineorder", "lo_quantity", PredicateConverter::ConvertRange(1, 25));
 
-		return combinator->ComputeResult(OUTPUT_SIZE);
+		return gen.EstimateCardinality();
 	}
 
 	template <typename CombinatorType>
-	std::shared_ptr<OmniSketchCell> Q1_2() {
-		auto combinator = std::make_unique<CombinatorType>();
-		combinator->AddPredicate(lo_orderdate, d_yearmonthnum->Probe(199401));
-		combinator->AddPredicate(lo_discount, PredicateConverter::ConvertRange(4, 6));
-		combinator->AddPredicate(lo_quantity, PredicateConverter::ConvertRange(26, 35));
+	double Q1_2() {
+		PlanGenerator gen(std::make_shared<CombinatorType>());
+		gen.AddPredicate("date", "d_yearmonthnum", PredicateConverter::ConvertPoint(199401));
+		gen.AddJoin("lineorder", "lo_orderdate", "date");
+		gen.AddPredicate("lineorder", "lo_discount", PredicateConverter::ConvertRange(4, 6));
+		gen.AddPredicate("lineorder", "lo_quantity", PredicateConverter::ConvertRange(26, 35));
 
-		return combinator->ComputeResult(OUTPUT_SIZE);
+		return gen.EstimateCardinality();
 	}
 
 	template <typename CombinatorType>
-	std::shared_ptr<OmniSketchCell> Q1_3() {
-		auto date_combinator = std::make_unique<CombinatorType>();
-		date_combinator->AddPredicate(d_year, PredicateConverter::ConvertPoint(1994));
-		date_combinator->AddPredicate(d_weeknuminyear, PredicateConverter::ConvertPoint(6));
+	double Q1_3() {
+		PlanGenerator gen(std::make_shared<CombinatorType>());
+		gen.AddPredicate("date", "d_yearmonthnum", PredicateConverter::ConvertPoint(199401));
+		gen.AddPredicate("date", "d_weeknuminyear", PredicateConverter::ConvertPoint(6));
+		gen.AddJoin("lineorder", "lo_orderdate", "date");
+		gen.AddPredicate("lineorder", "lo_discount", PredicateConverter::ConvertRange(5, 7));
+		gen.AddPredicate("lineorder", "lo_quantity", PredicateConverter::ConvertRange(36, 40));
 
-		auto combinator = std::make_unique<CombinatorType>();
-		combinator->AddPredicate(lo_orderdate, date_combinator->ComputeResult(OUTPUT_SIZE));
-		combinator->AddPredicate(lo_discount, PredicateConverter::ConvertRange(5, 7));
-		combinator->AddPredicate(lo_quantity, PredicateConverter::ConvertRange(36, 40));
-
-		return combinator->ComputeResult(OUTPUT_SIZE);
+		return gen.EstimateCardinality();
 	}
 
 	template <typename CombinatorType>
-	std::shared_ptr<OmniSketchCell> Q2_1() {
-		auto combinator = std::make_unique<CombinatorType>();
-		combinator->AddPredicate(lo_partkey, p_category->Probe("MFGR#12"));
-		combinator->AddPredicate(lo_suppkey, s_region->Probe("AMERICA"));
-		combinator->AddPredicate(lo_orderdate, d_year->GetRids());
+	double Q2_1() {
+		PlanGenerator gen(std::make_shared<CombinatorType>());
+		gen.AddPredicate("part", "p_category", PredicateConverter::ConvertPoint<std::string>("MFGR#12"));
+		gen.AddPredicate("supplier", "s_region", PredicateConverter::ConvertPoint<std::string>("AMERICA"));
+		gen.AddJoin("lineorder", "lo_partkey", "part");
+		gen.AddJoin("lineorder", "lo_suppkey", "supplier");
+		gen.AddJoin("lineorder", "lo_orderdate", "date");
 
-		return combinator->ComputeResult(OUTPUT_SIZE);
+		return gen.EstimateCardinality();
 	}
 
 	template <typename CombinatorType>
-	std::shared_ptr<OmniSketchCell> Q2_2() {
-		auto combinator = std::make_unique<CombinatorType>();
-		std::vector<std::string> probe_set {"MFGR#2221", "MFGR#2222", "MFGR#2223", "MFGR#2224",
-		                                    "MFGR#2225", "MFGR#2226", "MFGR#2227", "MFGR#2228"};
-		combinator->AddPredicate(lo_partkey, p_brand->ProbeSet(probe_set.data(), probe_set.size()));
-		combinator->AddPredicate(lo_suppkey, s_region->Probe("ASIA"));
-		combinator->AddPredicate(lo_orderdate, d_year->GetRids());
+	double Q2_2() {
+		PlanGenerator gen(std::make_shared<CombinatorType>());
+		gen.AddPredicate(
+		    "part", "p_brand",
+		    PredicateConverter::ConvertSet<std::string>({"MFGR#2221", "MFGR#2222", "MFGR#2223", "MFGR#2224",
+		                                                 "MFGR#2225", "MFGR#2226", "MFGR#2227", "MFGR#2228"}));
+		gen.AddPredicate("supplier", "s_region", PredicateConverter::ConvertPoint<std::string>("ASIA"));
+		gen.AddJoin("lineorder", "lo_partkey", "part");
+		gen.AddJoin("lineorder", "lo_suppkey", "supplier");
+		gen.AddJoin("lineorder", "lo_orderdate", "date");
 
-		return combinator->ComputeResult(OUTPUT_SIZE);
+		return gen.EstimateCardinality();
 	}
 
 	template <typename CombinatorType>
-	std::shared_ptr<OmniSketchCell> Q2_3() {
-		auto combinator = std::make_unique<CombinatorType>();
-		combinator->AddPredicate(lo_partkey, p_brand->Probe("MFGR#2339"));
-		combinator->AddPredicate(lo_suppkey, s_region->Probe("EUROPE"));
-		combinator->AddPredicate(lo_orderdate, d_year->GetRids());
+	double Q2_3() {
+		PlanGenerator gen(std::make_shared<CombinatorType>());
+		gen.AddPredicate("part", "p_brand", PredicateConverter::ConvertPoint<std::string>("MFGR#2339"));
+		gen.AddPredicate("supplier", "s_region", PredicateConverter::ConvertPoint<std::string>("EUROPE"));
+		gen.AddJoin("lineorder", "lo_partkey", "part");
+		gen.AddJoin("lineorder", "lo_suppkey", "supplier");
+		gen.AddJoin("lineorder", "lo_orderdate", "date");
 
-		return combinator->ComputeResult(OUTPUT_SIZE);
+		return gen.EstimateCardinality();
 	}
 
 	template <typename CombinatorType>
-	std::shared_ptr<OmniSketchCell> Q3_1() {
-		auto combinator = std::make_unique<CombinatorType>();
-		combinator->AddPredicate(lo_custkey, c_region->Probe("ASIA"));
-		combinator->AddPredicate(lo_suppkey, s_region->Probe("ASIA"));
-		combinator->AddPredicate(lo_orderdate, d_year->ProbeRange(1992, 1997));
+	double Q3_1() {
+		PlanGenerator gen(std::make_shared<CombinatorType>());
+		gen.AddPredicate("customer", "c_region", PredicateConverter::ConvertPoint<std::string>("ASIA"));
+		gen.AddPredicate("supplier", "s_region", PredicateConverter::ConvertPoint<std::string>("ASIA"));
+		gen.AddPredicate("date", "d_year", PredicateConverter::ConvertRange(1992, 1997));
+		gen.AddJoin("lineorder", "lo_custkey", "customer");
+		gen.AddJoin("lineorder", "lo_suppkey", "supplier");
+		gen.AddJoin("lineorder", "lo_orderdate", "date");
 
-		return combinator->ComputeResult(OUTPUT_SIZE);
+		return gen.EstimateCardinality();
 	}
 
 	template <typename CombinatorType>
-	std::shared_ptr<OmniSketchCell> Q3_2() {
-		auto combinator = std::make_unique<CombinatorType>();
-		combinator->AddPredicate(lo_custkey, c_nation->Probe("UNITED STATES"));
-		combinator->AddPredicate(lo_suppkey, s_nation->Probe("UNITED STATES"));
-		combinator->AddPredicate(lo_orderdate, d_year->ProbeRange(1992, 1997));
+	double Q3_2() {
+		PlanGenerator gen(std::make_shared<CombinatorType>());
+		gen.AddPredicate("customer", "c_nation", PredicateConverter::ConvertPoint<std::string>("UNITED STATES"));
+		gen.AddPredicate("supplier", "s_nation", PredicateConverter::ConvertPoint<std::string>("UNITED STATES"));
+		gen.AddPredicate("date", "d_year", PredicateConverter::ConvertRange(1992, 1997));
+		gen.AddJoin("lineorder", "lo_custkey", "customer");
+		gen.AddJoin("lineorder", "lo_suppkey", "supplier");
+		gen.AddJoin("lineorder", "lo_orderdate", "date");
 
-		return combinator->ComputeResult(OUTPUT_SIZE);
+		return gen.EstimateCardinality();
 	}
 
 	template <typename CombinatorType>
-	std::shared_ptr<OmniSketchCell> Q3_3() {
-		auto combinator = std::make_unique<CombinatorType>();
-		std::vector<std::string> probe_set {"UNITED KI1", "UNITED KI5"};
-		combinator->AddPredicate(lo_custkey, c_city->ProbeSet(probe_set.data(), probe_set.size()));
-		combinator->AddPredicate(lo_suppkey, s_city->ProbeSet(probe_set.data(), probe_set.size()));
-		combinator->AddPredicate(lo_orderdate, d_year->ProbeRange(1992, 1997));
+	double Q3_3() {
+		PlanGenerator gen(std::make_shared<CombinatorType>());
+		gen.AddPredicate("customer", "c_city",
+		                 PredicateConverter::ConvertSet<std::string>({"UNITED KI1", "UNITED KI5"}));
+		gen.AddPredicate("supplier", "s_city",
+		                 PredicateConverter::ConvertSet<std::string>({"UNITED KI1", "UNITED KI5"}));
+		gen.AddPredicate("date", "d_year", PredicateConverter::ConvertRange(1992, 1997));
+		gen.AddJoin("lineorder", "lo_custkey", "customer");
+		gen.AddJoin("lineorder", "lo_suppkey", "supplier");
+		gen.AddJoin("lineorder", "lo_orderdate", "date");
 
-		return combinator->ComputeResult(OUTPUT_SIZE);
+		return gen.EstimateCardinality();
 	}
 
 	template <typename CombinatorType>
-	std::shared_ptr<OmniSketchCell> Q3_4() {
-		auto combinator = std::make_unique<CombinatorType>();
-		std::vector<std::string> probe_set {"UNITED KI1", "UNITED KI5"};
-		combinator->AddPredicate(lo_custkey, c_city->ProbeSet(probe_set.data(), probe_set.size()));
-		combinator->AddPredicate(lo_suppkey, s_city->ProbeSet(probe_set.data(), probe_set.size()));
-		combinator->AddPredicate(lo_orderdate, d_yearmonth->Probe("Dec1997"));
+	double Q3_4() {
+		PlanGenerator gen(std::make_shared<CombinatorType>());
+		gen.AddPredicate("customer", "c_city",
+		                 PredicateConverter::ConvertSet<std::string>({"UNITED KI1", "UNITED KI5"}));
+		gen.AddPredicate("supplier", "s_city",
+		                 PredicateConverter::ConvertSet<std::string>({"UNITED KI1", "UNITED KI5"}));
+		gen.AddPredicate("date", "d_yearmonth", PredicateConverter::ConvertPoint<std::string>("Dec1997"));
+		gen.AddJoin("lineorder", "lo_custkey", "customer");
+		gen.AddJoin("lineorder", "lo_suppkey", "supplier");
+		gen.AddJoin("lineorder", "lo_orderdate", "date");
 
-		return combinator->ComputeResult(OUTPUT_SIZE);
+		return gen.EstimateCardinality();
 	}
 
 	template <typename CombinatorType>
-	std::shared_ptr<OmniSketchCell> Q4_1() {
-		auto combinator = std::make_unique<CombinatorType>();
-		combinator->AddPredicate(lo_custkey, c_region->Probe("AMERICA"));
-		combinator->AddPredicate(lo_suppkey, s_region->Probe("AMERICA"));
-		std::vector<std::string> probe_set {"MFGR#1", "MFGR#2"};
-		combinator->AddPredicate(lo_partkey, p_mfgr->ProbeSet(probe_set.data(), probe_set.size()));
-		combinator->AddPredicate(lo_orderdate, d_year->GetRids());
+	double Q4_1() {
+		PlanGenerator gen(std::make_shared<CombinatorType>());
+		gen.AddPredicate("customer", "c_region", PredicateConverter::ConvertPoint<std::string>("AMERICA"));
+		gen.AddPredicate("supplier", "s_region", PredicateConverter::ConvertPoint<std::string>("AMERICA"));
+		gen.AddPredicate("part", "p_mfgr", PredicateConverter::ConvertSet<std::string>({"MFGR#1", "MFGR#2"}));
+		gen.AddJoin("lineorder", "lo_custkey", "customer");
+		gen.AddJoin("lineorder", "lo_suppkey", "supplier");
+		gen.AddJoin("lineorder", "lo_partkey", "part");
+		gen.AddJoin("lineorder", "lo_orderdate", "date");
 
-		return combinator->ComputeResult(OUTPUT_SIZE);
+		return gen.EstimateCardinality();
 	}
 
 	template <typename CombinatorType>
-	std::shared_ptr<OmniSketchCell> Q4_2() {
-		auto combinator = std::make_unique<CombinatorType>();
-		combinator->AddPredicate(lo_custkey, c_region->Probe("AMERICA"));
-		combinator->AddPredicate(lo_suppkey, s_region->Probe("AMERICA"));
-		std::vector<std::string> probe_set {"MFGR#1", "MFGR#2"};
-		combinator->AddPredicate(lo_partkey, p_mfgr->ProbeSet(probe_set.data(), probe_set.size()));
-		combinator->AddPredicate(lo_orderdate, d_year->ProbeRange(1997, 1998));
+	double Q4_2() {
+		PlanGenerator gen(std::make_shared<CombinatorType>());
+		gen.AddPredicate("customer", "c_region", PredicateConverter::ConvertPoint<std::string>("AMERICA"));
+		gen.AddPredicate("supplier", "s_region", PredicateConverter::ConvertPoint<std::string>("AMERICA"));
+		gen.AddPredicate("part", "p_mfgr", PredicateConverter::ConvertSet<std::string>({"MFGR#1", "MFGR#2"}));
+		gen.AddPredicate("date", "d_year", PredicateConverter::ConvertRange(1997, 1998));
+		gen.AddJoin("lineorder", "lo_custkey", "customer");
+		gen.AddJoin("lineorder", "lo_suppkey", "supplier");
+		gen.AddJoin("lineorder", "lo_partkey", "part");
+		gen.AddJoin("lineorder", "lo_orderdate", "date");
 
-		return combinator->ComputeResult(OUTPUT_SIZE);
+		return gen.EstimateCardinality();
 	}
 
 	template <typename CombinatorType>
-	std::shared_ptr<OmniSketchCell> Q4_3() {
-		auto combinator = std::make_unique<CombinatorType>();
-		combinator->AddPredicate(lo_custkey, c_region->Probe("AMERICA"));
-		combinator->AddPredicate(lo_suppkey, s_nation->Probe("UNITED STATES"));
-		combinator->AddPredicate(lo_partkey, p_category->Probe("MFGR#14"));
-		combinator->AddPredicate(lo_orderdate, d_year->ProbeRange(1997, 1998));
+	double Q4_3() {
+		PlanGenerator gen(std::make_shared<CombinatorType>());
+		gen.AddPredicate("customer", "c_region", PredicateConverter::ConvertPoint<std::string>("AMERICA"));
+		gen.AddPredicate("supplier", "s_nation", PredicateConverter::ConvertPoint<std::string>("UNITED STATES"));
+		gen.AddPredicate("part", "p_category", PredicateConverter::ConvertPoint<std::string>("MFGR#14"));
+		gen.AddPredicate("date", "d_year", PredicateConverter::ConvertRange(1997, 1998));
+		gen.AddJoin("lineorder", "lo_custkey", "customer");
+		gen.AddJoin("lineorder", "lo_suppkey", "supplier");
+		gen.AddJoin("lineorder", "lo_partkey", "part");
+		gen.AddJoin("lineorder", "lo_orderdate", "date");
 
-		return combinator->ComputeResult(OUTPUT_SIZE);
+		return gen.EstimateCardinality();
 	}
 
 protected:
-	std::shared_ptr<IntOmniSketch> lo_discount;
-	std::shared_ptr<IntOmniSketch> lo_quantity;
-	std::shared_ptr<IntOmniSketch> lo_orderdate;
-	std::shared_ptr<IntOmniSketch> lo_partkey;
-	std::shared_ptr<IntOmniSketch> lo_custkey;
-	std::shared_ptr<IntOmniSketch> lo_suppkey;
-	std::shared_ptr<IntOmniSketch> d_year;
-	std::shared_ptr<IntOmniSketch> d_yearmonthnum;
-	std::shared_ptr<IntOmniSketch> d_weeknuminyear;
-	std::shared_ptr<StringOmniSketch> d_yearmonth;
-	std::shared_ptr<StringOmniSketch> p_category;
-	std::shared_ptr<StringOmniSketch> p_brand;
-	std::shared_ptr<StringOmniSketch> p_mfgr;
-	std::shared_ptr<StringOmniSketch> s_region;
-	std::shared_ptr<StringOmniSketch> s_nation;
-	std::shared_ptr<StringOmniSketch> s_city;
-	std::shared_ptr<StringOmniSketch> c_region;
-	std::shared_ptr<StringOmniSketch> c_nation;
-	std::shared_ptr<StringOmniSketch> c_city;
+	const SketchesSingleton &singleton;
 };
 
 static const std::vector<int64_t> query_idxs {11, 12, 13, 21, 22, 23, 31, 32, 33, 34, 41, 42, 43};
@@ -417,8 +317,8 @@ BENCHMARK_DEFINE_F(SSBFixture, UncorrelatedCombination)(::benchmark::State &stat
 	for (auto _ : state) {
 		auto result = ExecuteQuery<UncorrelatedCombinator>(query);
 		state.counters["Card"] = (double)GetCardinality(query);
-		state.counters["Est"] = (double)result->RecordCount();
-		state.counters["QErr"] = (double)result->RecordCount() / (double)GetCardinality(query);
+		state.counters["Est"] = result;
+		state.counters["QErr"] = result / (double)GetCardinality(query);
 	}
 }
 
@@ -429,8 +329,8 @@ BENCHMARK_DEFINE_F(SSBFixture, ExhaustiveCombination)(::benchmark::State &state)
 	for (auto _ : state) {
 		auto result = ExecuteQuery<ExhaustiveCombinator>(query);
 		state.counters["Card"] = (double)GetCardinality(query);
-		state.counters["Est"] = (double)result->RecordCount();
-		state.counters["QErr"] = (double)result->RecordCount() / (double)GetCardinality(query);
+		state.counters["Est"] = result;
+		state.counters["QErr"] = result / (double)GetCardinality(query);
 	}
 }
 

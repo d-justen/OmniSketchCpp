@@ -15,10 +15,13 @@ endif()
 
 set(SOURCE_FILES
         src/include/combinator.hpp
+        src/include/csv_importer.hpp
         src/include/hash.hpp
         src/include/min_hash_sketch.hpp
         src/include/omni_sketch.hpp
         src/include/omni_sketch_cell.hpp
+        src/include/plan_generator.hpp
+        src/include/registry.hpp
         src/include/set_membership.hpp
         src/include/value.hpp
 
@@ -26,6 +29,8 @@ set(SOURCE_FILES
         src/min_hash_sketch.cpp
         src/omni_sketch.cpp
         src/omni_sketch_cell.cpp
+        src/plan_generator.cpp
+        src/registry.cpp
 )
 
 add_library(omnisketch STATIC ${SOURCE_FILES})
