@@ -35,30 +35,35 @@ bool CheckIfResolvable(const std::shared_ptr<PlanItem> &item) {
 	return not_resolvable_count <= 1;
 }
 
-double PlanGenerator::EstimateCardinality() {
+double PlanGenerator::EstimateCardinality() const {
 	auto &registry = Registry::Get();
-	std::unordered_set<std::shared_ptr<PlanItem>> left_over;
+	std::vector<std::pair<std::shared_ptr<PlanItem>, bool>> item_vec;
 	for (auto &plan_item_pair : plan_items) {
 		auto &combinator = plan_item_pair.second->combinator;
 		if (!combinator->HasPredicates() && plan_item_pair.second->probed_from.empty()) {
 			// This relation is not filtered by any predicates or previous joins
 			combinator->AddUnfilteredRids(registry.ProduceRidSample(plan_item_pair.first));
 		}
-		left_over.insert(plan_item_pair.second);
+		item_vec.emplace_back(plan_item_pair.second, true);
 	}
 
-	while (left_over.size() > 1) {
-		std::unordered_set<std::shared_ptr<PlanItem>> left_over_next;
-		for (const auto &plan_item : left_over) {
+	size_t items_alive = item_vec.size();
+	while (items_alive > 1) {
+		for (const auto &plan_item_pair : item_vec) {
+			if (!plan_item_pair.second) {
+				continue;
+			}
+
+			const auto &plan_item = plan_item_pair.first;
 			if (!plan_item->probed_from.empty()) {
-				left_over_next.insert(plan_item);
 				continue;
 			}
 
 			if (plan_item->probes_into.empty()) {
 				// This should be our last relation
-				assert(left_over_next.empty() && "Unconnected relation.");
-				left_over_next.insert(plan_item);
+				if (items_alive != 1) {
+					throw std::logic_error("Unconnected relation: " + std::to_string(items_alive) + " of " + std::to_string(item_vec.size()) + " left.");
+				}
 				continue;
 			}
 
@@ -74,6 +79,8 @@ double PlanGenerator::EstimateCardinality() {
 
 				fk_side_item->combinator->AddPredicate(fk_sketch, pk_probe_set);
 				fk_side_item->probed_from.erase(plan_item);
+				std::find(item_vec.begin(), item_vec.end(), std::make_pair(plan_item, true))->second = false;
+				items_alive--;
 				continue;
 			}
 
@@ -85,28 +92,47 @@ double PlanGenerator::EstimateCardinality() {
 					return 0;
 				}
 
+				size_t current_fk_idx = 0;
 				for (auto &fk_side_item_pair : plan_item->probes_into) {
 					auto &fk_side_item = fk_side_item_pair.first;
 					auto &fk_omni_sketch = fk_side_item_pair.second;
-					if (!fk_side_item->probes_into.empty() || fk_side_item->probed_from.size() > 1) {
+					if (!fk_side_item->probes_into.empty() || fk_side_item->probed_from.size() > 1 ||
+					    current_fk_idx == plan_item->probes_into.size() - 1) {
 						assert(!item_to_probe_into);
 						assert(!sketch_to_probe_into);
 						item_to_probe_into = fk_side_item;
 						sketch_to_probe_into = fk_omni_sketch;
 					} else {
 						pk_probe_set = fk_side_item->combinator->FilterProbeSet(fk_omni_sketch, pk_probe_set);
+						fk_side_item->probed_from.erase(plan_item);
+						std::find(item_vec.begin(), item_vec.end(), std::make_pair(fk_side_item, true))->second = false;
+						items_alive--;
+						if (pk_probe_set->RecordCount() == 0) {
+							return 0.0;
+						}
 					}
+					current_fk_idx++;
 				}
-				item_to_probe_into->combinator->AddPredicate(sketch_to_probe_into, pk_probe_set);
-				item_to_probe_into->probed_from.erase(item_to_probe_into);
-				continue;
-			}
 
-			left_over_next.insert(plan_item);
+				if (item_to_probe_into && sketch_to_probe_into) {
+					item_to_probe_into->combinator->AddPredicate(sketch_to_probe_into, pk_probe_set);
+					item_to_probe_into->probed_from.erase(plan_item);
+					std::find(item_vec.begin(), item_vec.end(), std::make_pair(plan_item, true))->second = false;
+					items_alive--;
+				}
+				plan_item->probes_into.clear();
+			}
 		}
-		left_over = left_over_next;
 	}
-	auto plan_item = *left_over.begin();
+
+	std::shared_ptr<PlanItem> plan_item;
+	for (auto &item : item_vec) {
+		if (item.second) {
+			assert(!plan_item);
+			plan_item = item.first;
+		}
+	}
+
 	assert(plan_item->probes_into.empty());
 	assert(plan_item->probed_from.empty());
 	auto card_est = plan_item->combinator->ComputeResult(UINT64_MAX);

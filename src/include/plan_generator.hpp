@@ -15,7 +15,7 @@ struct PlanItem {
 
 class PlanGenerator {
 public:
-	explicit PlanGenerator(std::shared_ptr<OmniSketchCombinator> combinator = std::make_shared<ExhaustiveCombinator>()) {
+	explicit PlanGenerator(const std::shared_ptr<OmniSketchCombinator>& combinator = std::make_shared<ExhaustiveCombinator>()) {
 		if (std::dynamic_pointer_cast<ExhaustiveCombinator>(combinator)) {
 			combinator_creator = []() {
 				return std::make_shared<ExhaustiveCombinator>();
@@ -29,7 +29,7 @@ public:
 	}
 	void AddPredicate(const std::string& table_name, const std::string& column_name, const std::shared_ptr<OmniSketchCell>& probe_set);
 	void AddJoin(const std::string& fk_table_name, const std::string& fk_column_name, const std::string& pk_table_name);
-	double EstimateCardinality();
+	double EstimateCardinality() const;
 protected:
 	std::shared_ptr<PlanItem> GetOrCreatePlanItem(const std::string& table_name);
 

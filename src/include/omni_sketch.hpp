@@ -17,13 +17,13 @@ public:
 	virtual size_t RecordCount() const = 0;
 	virtual std::shared_ptr<OmniSketchCell> ProbeHash(uint64_t hash,
 	                                                  std::vector<std::shared_ptr<OmniSketchCell>> &matches) const = 0;
-	virtual std::shared_ptr<OmniSketchCell> ProbeSet(const std::shared_ptr<MinHashSketch> &values) const = 0;
-	virtual std::shared_ptr<OmniSketchCell> ProbeSet(const std::shared_ptr<OmniSketchCell> &values) const = 0;
-	virtual void AddRecord(const Value &value, uint64_t record_id) = 0;
+	virtual std::shared_ptr<OmniSketchCell> ProbeHashedSet(const std::shared_ptr<MinHashSketch> &values) const = 0;
+	virtual std::shared_ptr<OmniSketchCell> ProbeHashedSet(const std::shared_ptr<OmniSketchCell> &values) const = 0;
+	virtual void AddValueRecord(const Value &value, uint64_t record_id) = 0;
 	virtual void AddRecordHashed(uint64_t value_hash, uint64_t record_id_hash) = 0;
 	virtual void AddNullValues(size_t count) = 0;
-	virtual std::shared_ptr<OmniSketchCell> Probe(const Value &value) const = 0;
-	virtual std::shared_ptr<OmniSketchCell> ProbeSet(const ValueSet &values) const = 0;
+	virtual std::shared_ptr<OmniSketchCell> ProbeValue(const Value &value) const = 0;
+	virtual std::shared_ptr<OmniSketchCell> ProbeValueSet(const ValueSet &values) const = 0;
 	virtual void Flatten() = 0;
 	virtual size_t EstimateByteSize() const = 0;
 	virtual size_t Depth() const = 0;
@@ -42,16 +42,16 @@ public:
 	                std::shared_ptr<CellIdxMapper> hash_processor_p);
 	PointOmniSketch(size_t width, size_t depth, size_t max_sample_count_p);
 
-	void AddRecord(const Value &value, uint64_t record_id) override;
+	void AddValueRecord(const Value &value, uint64_t record_id) override;
 	void AddRecordHashed(uint64_t value_hash, uint64_t record_id_hash) override;
 	void AddNullValues(size_t count) override;
 	size_t RecordCount() const override;
-	std::shared_ptr<OmniSketchCell> Probe(const Value &value) const override;
+	std::shared_ptr<OmniSketchCell> ProbeValue(const Value &value) const override;
 	std::shared_ptr<OmniSketchCell> ProbeHash(uint64_t hash,
 	                                          std::vector<std::shared_ptr<OmniSketchCell>> &matches) const override;
-	std::shared_ptr<OmniSketchCell> ProbeSet(const std::shared_ptr<MinHashSketch> &values) const override;
-	std::shared_ptr<OmniSketchCell> ProbeSet(const std::shared_ptr<OmniSketchCell> &values) const override;
-	std::shared_ptr<OmniSketchCell> ProbeSet(const ValueSet &values) const override;
+	std::shared_ptr<OmniSketchCell> ProbeHashedSet(const std::shared_ptr<MinHashSketch> &values) const override;
+	std::shared_ptr<OmniSketchCell> ProbeHashedSet(const std::shared_ptr<OmniSketchCell> &values) const override;
+	std::shared_ptr<OmniSketchCell> ProbeValueSet(const ValueSet &values) const override;
 	void Flatten() override;
 	size_t EstimateByteSize() const override;
 	size_t Depth() const override;
@@ -91,6 +91,8 @@ public:
 	}
 
 	void AddRecord(const T &value, uint64_t record_id) {
+		min = std::min(min, value);
+		max = std::max(max, value);
 		PointOmniSketch::AddRecordHashed(hf->Hash(value), hf->HashRid(record_id));
 	}
 
@@ -107,7 +109,7 @@ public:
 			hashes.push_back(hf->Hash(values[value_idx]));
 		}
 
-		return PointOmniSketch::ProbeSet(std::make_shared<MinHashSketchVector>(hashes));
+		return PointOmniSketch::ProbeHashedSet(std::make_shared<MinHashSketchVector>(hashes));
 	}
 
 	std::shared_ptr<OmniSketchCell> ProbeRange(const T &lower_bound, const T &upper_bound) const {
@@ -117,11 +119,21 @@ public:
 			hashes.push_back(hf->Hash(value));
 		}
 
-		return PointOmniSketch::ProbeSet(std::make_shared<MinHashSketchVector>(hashes));
+		return PointOmniSketch::ProbeHashedSet(std::make_shared<MinHashSketchVector>(hashes));
+	}
+
+	T GetMin() const {
+		return min;
+	}
+
+	T GetMax() const {
+		return max;
 	}
 
 protected:
 	std::shared_ptr<HashFunction<T>> hf;
+	T min = std::numeric_limits<T>::max();
+	T max = std::numeric_limits<T>::min();
 };
 
 } // namespace omnisketch

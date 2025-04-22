@@ -11,6 +11,10 @@ FetchContent_Declare(
         GIT_TAG origin/main
 )
 
+if (NOT CMAKE_BUILD_TYPE MATCHES Debug)
+    add_definitions(-DNDEBUG)
+endif()
+
 FetchContent_MakeAvailable(googlebenchmark)
 
 add_executable(min_hash_sketch_benchmark min_hash_sketch_benchmark.cpp)

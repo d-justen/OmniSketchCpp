@@ -37,6 +37,7 @@ public:
 
 class OmniSketchCombinator {
 public:
+	virtual ~OmniSketchCombinator() = default;
 	virtual void AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,
 	                          std::shared_ptr<OmniSketchCell> probe_sample) = 0;
 	virtual void AddUnfilteredRids(std::shared_ptr<OmniSketch> omni_sketch) = 0;

@@ -17,6 +17,7 @@ public:
 	};
 
 public:
+	virtual ~MinHashSketch() = default;
 	virtual void AddRecord(uint64_t hash) = 0;
 	virtual size_t Size() const = 0;
 	virtual size_t MaxCount() const = 0;

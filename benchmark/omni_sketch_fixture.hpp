@@ -3,12 +3,20 @@
 #include <benchmark/benchmark.h>
 
 #include "include/omni_sketch.hpp"
+#include "registry.hpp"
 
 template <unsigned int WIDTH, unsigned int DEPTH, unsigned int SAMPLE_COUNT>
 class OmniSketchFixture : public benchmark::Fixture {
 public:
-	void SetUp(::benchmark::State &state) override {
-		omni_sketch = std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(WIDTH, DEPTH, SAMPLE_COUNT);
+	OmniSketchFixture() {
+		omnisketch::OmniSketchConfig config;
+		config.SetSampleCount(SAMPLE_COUNT);
+		config.SetWidth(WIDTH);
+		config.depth = DEPTH;
+		config.hash_processor = std::make_shared<omnisketch::BarrettModSplitHashMapper>(WIDTH);
+		omni_sketch = std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(
+		    config.width, config.depth, std::make_shared<omnisketch::MurmurHashFunction<size_t>>(),
+		    config.min_hash_sketch_factory, config.set_membership_algo, config.hash_processor);
 	}
 
 	void FillOmniSketch(size_t value_count, size_t multiplicity,
@@ -23,9 +31,6 @@ public:
 		}
 	}
 
-	void TearDown(::benchmark::State &state) override {
-		omni_sketch = nullptr;
-	}
-
 	std::shared_ptr<omnisketch::TypedPointOmniSketch<size_t>> omni_sketch;
+	size_t current_repetition = 0;
 };

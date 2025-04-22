@@ -33,8 +33,8 @@ public:
 	static std::shared_ptr<OmniSketchCell> Combine(const std::vector<std::shared_ptr<OmniSketchCell>> &cells);
 
 protected:
-	size_t record_count;
 	std::shared_ptr<MinHashSketch> min_hash_sketch;
+	size_t record_count;
 };
 
 } // namespace omnisketch

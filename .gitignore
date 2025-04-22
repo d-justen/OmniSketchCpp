@@ -8,3 +8,5 @@ data
 .idea
 .*.sw?
 .sw?
+*.pdf
+script/__pycache__

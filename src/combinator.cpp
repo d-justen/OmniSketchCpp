@@ -147,7 +147,7 @@ bool ExhaustiveCombinator::HasPredicates() const {
 void ExhaustiveCombinator::AddUnfilteredRids(std::shared_ptr<OmniSketchCell> rid_sample) {
 	base_card = rid_sample->RecordCount();
 	max_sample_count = rid_sample->MaxSampleCount();
-	sampling_probabilities.push_back(rid_sample->SamplingProbability());
+	sampling_probabilities.push_back(1);
 
 	join_key_matches.emplace_back();
 	join_key_matches.back().emplace_back(rid_sample, rid_sample->RecordCount());
@@ -155,11 +155,11 @@ void ExhaustiveCombinator::AddUnfilteredRids(std::shared_ptr<OmniSketchCell> rid
 
 void UncorrelatedCombinator::AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,
                                           std::shared_ptr<OmniSketchCell> probe_sample) {
-	if (joins.empty()) {
+	if (join_results.empty()) {
 		base_card = omni_sketch->RecordCount();
 	}
 	assert(base_card == omni_sketch->RecordCount());
-	const auto join_result = omni_sketch->ProbeSet(probe_sample->GetMinHashSketch());
+	const auto join_result = omni_sketch->ProbeHashedSet(probe_sample->GetMinHashSketch());
 	const double join_key_sampling_probability = probe_sample->SamplingProbability();
 	const double join_selectivity =
 	    std::min(1.0, ((double)join_result->RecordCount() / join_key_sampling_probability) / (double)base_card);

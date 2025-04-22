@@ -56,6 +56,10 @@ public:
 		return sketches[table_name][column_name];
 	}
 
+	bool HasOmniSketch(const std::string &table_name, const std::string &column_name) {
+	    return sketches.find(table_name) != sketches.end() && sketches[table_name].find(column_name) != sketches[table_name].end();
+	}
+
 	std::shared_ptr<OmniSketchCell> ProduceRidSample(const std::string &table_name) {
 		return sketches[table_name].begin()->second->GetRids();
 	}

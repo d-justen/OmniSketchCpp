@@ -15,7 +15,11 @@ template <bool IsUniform>
 class ProbeErrorFixture : public benchmark::Fixture {
 public:
 	void SetUp(::benchmark::State &state) override {
-		if (state.range(0) != attribute_count || state.range(1) != min_hash_sample_size) {
+		auto param_0 = static_cast<size_t>(state.range(0));
+		auto param_1 = static_cast<size_t>(state.range(1));
+		auto param_2 = static_cast<size_t>(state.range(2));
+		
+		if (param_0 != attribute_count || param_1 != min_hash_sample_size) {
 			omni_sketch = nullptr;
 			cardinalities.clear();
 			all_values.clear();
@@ -24,11 +28,11 @@ public:
 		const auto name = std::string(GetName());
 
 		if (name.find("Join") != std::string::npos) {
-			attribute_count = state.range(1);
-			min_hash_sample_size = state.range(2);
+			attribute_count = param_1;
+			min_hash_sample_size = param_2;
 		} else {
-			attribute_count = state.range(0);
-			min_hash_sample_size = state.range(1);
+			attribute_count = param_0;
+			min_hash_sample_size = param_1;
 		}
 		if (!omni_sketch) {
 			omni_sketch = std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(SKETCH_WIDTH, SKETCH_DEPTH,
@@ -51,7 +55,7 @@ public:
 			}
 		} else {
 			std::uniform_real_distribution<double> dist(0.0, 1.0);
-			for (int i = 1; i < RECORD_COUNT + 1; ++i) {
+			for (size_t i = 1; i < RECORD_COUNT + 1; ++i) {
 				double u = dist(gen);
 				double skewed = pow(u, SKEW);
 				size_t value = 1 + skewed * attribute_count;

@@ -76,7 +76,7 @@ public:
 		state.counters["MatchCount"] = result_count;
 	}
 
-	void TearDown(::benchmark::State &state) override {
+	void TearDown(::benchmark::State &) override {
 		sketches.clear();
 		sketches_flattened.clear();
 	}

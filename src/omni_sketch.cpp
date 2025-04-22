@@ -22,7 +22,7 @@ PointOmniSketch::PointOmniSketch(size_t width, size_t depth, size_t max_sample_c
                       std::make_shared<ProbeAllSum>(), std::make_shared<BarrettModSplitHashMapper>(width)) {
 }
 
-void PointOmniSketch::AddRecord(const Value &value, const uint64_t record_id) {
+void PointOmniSketch::AddValueRecord(const Value &value, uint64_t record_id) {
 	const uint64_t value_hash = value.GetHash();
 	const uint64_t record_id_hash = hash_functions::Hash(record_id);
 	AddRecordHashed(value_hash, record_id_hash);
@@ -32,7 +32,7 @@ size_t PointOmniSketch::RecordCount() const {
 	return record_count;
 }
 
-std::shared_ptr<OmniSketchCell> PointOmniSketch::Probe(const Value &value) const {
+std::shared_ptr<OmniSketchCell> PointOmniSketch::ProbeValue(const Value &value) const {
 	std::vector<std::shared_ptr<OmniSketchCell>> matches(depth);
 
 	return ProbeHash(value.GetHash(), matches);
@@ -51,7 +51,7 @@ PointOmniSketch::ProbeHash(uint64_t hash, std::vector<std::shared_ptr<OmniSketch
 	return OmniSketchCell::Intersect(matches);
 }
 
-std::shared_ptr<OmniSketchCell> PointOmniSketch::ProbeSet(const std::shared_ptr<MinHashSketch> &values) const {
+std::shared_ptr<OmniSketchCell> PointOmniSketch::ProbeHashedSet(const std::shared_ptr<MinHashSketch> &values) const {
 	std::vector<std::vector<std::shared_ptr<OmniSketchCell>>> matches(
 	    values->Size(), std::vector<std::shared_ptr<OmniSketchCell>>(depth));
 
@@ -68,11 +68,11 @@ std::shared_ptr<OmniSketchCell> PointOmniSketch::ProbeSet(const std::shared_ptr<
 	return set_membership_algo->Execute(min_hash_sketch_factory, matches);
 }
 
-std::shared_ptr<OmniSketchCell> PointOmniSketch::ProbeSet(const std::shared_ptr<OmniSketchCell> &values) const {
-	return ProbeSet(values->GetMinHashSketch());
+std::shared_ptr<OmniSketchCell> PointOmniSketch::ProbeHashedSet(const std::shared_ptr<OmniSketchCell> &values) const {
+	return ProbeHashedSet(values->GetMinHashSketch());
 }
 
-std::shared_ptr<OmniSketchCell> PointOmniSketch::ProbeSet(const ValueSet &values) const {
+std::shared_ptr<OmniSketchCell> PointOmniSketch::ProbeValueSet(const ValueSet &values) const {
 	const auto &hashes = values.GetHashes();
 	std::vector<std::vector<std::shared_ptr<OmniSketchCell>>> matches(
 	    hashes.size(), std::vector<std::shared_ptr<OmniSketchCell>>(depth));

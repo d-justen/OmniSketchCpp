@@ -6,6 +6,7 @@ namespace omnisketch {
 
 class SetMembershipAlgorithm {
 public:
+	virtual ~SetMembershipAlgorithm() = default;
 	virtual std::shared_ptr<OmniSketchCell>
 	Execute(const std::shared_ptr<MinHashSketchFactory> &result_factory,
 	        const std::vector<std::vector<std::shared_ptr<OmniSketchCell>>> &cells) const = 0;

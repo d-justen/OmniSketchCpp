@@ -43,6 +43,7 @@ inline uint64_t Hash(const std::string &value) {
 template <typename T>
 class HashFunction {
 public:
+	virtual ~HashFunction() = default;
 	virtual uint64_t Hash(const T &value) const = 0;
 	virtual uint64_t HashRid(uint64_t rid) const = 0;
 };

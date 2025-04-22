@@ -6,6 +6,10 @@ project(omnisketch
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_CXX_FLAGS "-Werror -Wall -Wextra")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+
 option(OMNISKETCH_ENABLE_TESTS "Enable tests" OFF)
 option(OMNISKETCH_ENABLE_BENCHMARKS "Enable benchmarks" OFF)
 
@@ -26,6 +30,7 @@ set(SOURCE_FILES
         src/include/value.hpp
 
         src/combinator.cpp
+        src/csv_importer.cpp
         src/min_hash_sketch.cpp
         src/omni_sketch.cpp
         src/omni_sketch_cell.cpp
