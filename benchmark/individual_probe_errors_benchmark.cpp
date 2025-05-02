@@ -1,6 +1,6 @@
 #include <benchmark/benchmark.h>
-#include "include/combinator.hpp"
-#include "include/omni_sketch.hpp"
+#include "combinator.hpp"
+#include "omni_sketch/standard_omni_sketch.hpp"
 
 #include <random>
 
@@ -18,7 +18,7 @@ public:
 		auto param_0 = static_cast<size_t>(state.range(0));
 		auto param_1 = static_cast<size_t>(state.range(1));
 		auto param_2 = static_cast<size_t>(state.range(2));
-		
+
 		if (param_0 != attribute_count || param_1 != min_hash_sample_size) {
 			omni_sketch = nullptr;
 			cardinalities.clear();

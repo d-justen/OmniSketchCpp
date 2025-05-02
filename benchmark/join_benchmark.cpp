@@ -1,8 +1,8 @@
 #include <benchmark/benchmark.h>
 
-#include "include/combinator.hpp"
-#include "include/csv_importer.hpp"
-#include "include/plan_generator.hpp"
+#include "combinator.hpp"
+#include "csv_importer.hpp"
+#include "plan_generator.hpp"
 
 #include <numeric>
 

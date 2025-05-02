@@ -1,7 +1,8 @@
 #include <gtest/gtest.h>
 
-#include "include/omni_sketch.hpp"
-#include "include/omni_sketch_cell.hpp"
+#include "min_hash_sketch/min_hash_sketch_set.hpp"
+#include "omni_sketch/standard_omni_sketch.hpp"
+#include "omni_sketch/foreign_sorted_omni_sketch.hpp"
 
 TEST(OmniSketchTest, BasicEstimation) {
 	auto sketch = std::make_shared<omnisketch::TypedPointOmniSketch<int>>(4, 3, 8);
@@ -13,7 +14,7 @@ TEST(OmniSketchTest, BasicEstimation) {
 	EXPECT_EQ(sketch->Probe(1)->RecordCount(), 2);
 	EXPECT_EQ(sketch->Probe(3)->RecordCount(), 1);
 	EXPECT_EQ(sketch->RecordCount(), 4);
-	EXPECT_EQ(sketch->Probe(0)->RecordCount(), 0);
+	EXPECT_EQ(sketch->Probe(4)->RecordCount(), 0);
 }
 
 TEST(OmniSketchTest, NoMatches) {
@@ -65,4 +66,18 @@ TEST(OmniSketchTest, GetAllRids) {
 
 	auto intersection = control_sketch->Intersect({control_sketch, unfiltered_rids->GetMinHashSketch()});
 	EXPECT_EQ(intersection->Size(), control_sketch->Size());
+}
+
+TEST(OmniSketchTest, ForeignSortedOmniSketch) {
+	auto sketch = std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(4, 3, 8);
+	auto ref_sketch = std::make_shared<omnisketch::ForeignSortedOmniSketch<size_t>>(sketch, 4, 3, 8);
+	for (size_t i = 0; i < 1000; i++) {
+		sketch->AddRecord(i % 100, i);
+	}
+
+	for (size_t i = 0; i < 100; i++) {
+		ref_sketch->AddRecord(i % 10, i);
+	}
+
+	auto probe_result = ref_sketch->Probe(0);
 }

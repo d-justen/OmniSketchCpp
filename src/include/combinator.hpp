@@ -1,7 +1,7 @@
 #pragma once
 
-#include "omni_sketch.hpp"
-#include "value.hpp"
+#include "omni_sketch/omni_sketch.hpp"
+#include "util/value.hpp"
 
 namespace omnisketch {
 
@@ -83,8 +83,7 @@ protected:
 	size_t base_card;
 
 protected:
-	void FindMatchesInNextJoin(const std::vector<std::vector<ExhaustiveCombinatorItem>> &join_key_matches,
-	                           const std::shared_ptr<MinHashSketch> &current, size_t join_idx, size_t current_n_max,
+	void FindMatchesInNextJoin(const std::shared_ptr<MinHashSketch> &current, size_t join_idx, size_t current_n_max,
 	                           std::vector<double> &match_counts, std::shared_ptr<OmniSketchCell> &result) const;
 };
 

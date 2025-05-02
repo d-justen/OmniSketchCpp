@@ -6,11 +6,22 @@ void ExhaustiveCombinator::AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,
                                         std::shared_ptr<OmniSketchCell> probe_sample) {
 	if (join_key_matches.empty()) {
 		max_sample_count = omni_sketch->MinHashSketchSize();
-		base_card = omni_sketch->RecordCount();
 	}
-	assert(max_sample_count == omni_sketch->MinHashSketchSize());
-	assert(base_card == omni_sketch->RecordCount());
-	sampling_probabilities.push_back(probe_sample->SamplingProbability());
+	if (omni_sketch->MinHashSketchSize() < max_sample_count) {
+		for (auto &join_key_match : join_key_matches) {
+			for (auto &item : join_key_match) {
+				item.cell->GetMinHashSketch()->Resize(omni_sketch->MinHashSketchSize());
+			}
+		}
+	}
+
+	max_sample_count = std::min(max_sample_count, omni_sketch->MinHashSketchSize());
+	base_card = std::max(base_card, omni_sketch->RecordCount());
+	if (omni_sketch->Type() == OmniSketchType::FOREIGN_SORTED) {
+		sampling_probabilities.push_back(1);
+	} else {
+		sampling_probabilities.push_back(probe_sample->SamplingProbability());
+	}
 
 	std::vector<ExhaustiveCombinatorItem> join_results;
 	join_results.reserve(probe_sample->SampleCount());
@@ -18,9 +29,13 @@ void ExhaustiveCombinator::AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,
 	std::vector<std::shared_ptr<OmniSketchCell>> matches(omni_sketch->Depth());
 	auto join_key_it = probe_sample->GetMinHashSketch()->Iterator();
 	size_t card_sum = 0;
-	for (size_t join_key_idx = 0; join_key_idx < probe_sample->SampleCount(); join_key_idx++) {
-		auto probe_result = omni_sketch->ProbeHash(join_key_it->Next(), matches);
+	for (; !join_key_it->IsAtEnd(); join_key_it->Next()) {
+		auto probe_result = omni_sketch->ProbeHash(join_key_it->Current(), matches);
 		if (probe_result->SampleCount() > 0) {
+			if (probe_result->MaxSampleCount() > max_sample_count) {
+				// TODO(perf): Allow probing with reduced sample count to avoid copying hashes
+				probe_result->SetMinHashSketch(probe_result->GetMinHashSketch()->Resize(max_sample_count));
+			}
 			join_results.emplace_back(probe_result, ExhaustiveCombinatorItem::GetNMax(matches));
 			card_sum += probe_result->RecordCount();
 		}
@@ -29,10 +44,9 @@ void ExhaustiveCombinator::AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,
 	join_key_matches.push_back(join_results);
 }
 
-void ExhaustiveCombinator::FindMatchesInNextJoin(
-    const std::vector<std::vector<ExhaustiveCombinatorItem>> &join_key_matches,
-    const std::shared_ptr<MinHashSketch> &current, size_t join_idx, size_t current_n_max,
-    std::vector<double> &match_counts, std::shared_ptr<OmniSketchCell> &result) const {
+void ExhaustiveCombinator::FindMatchesInNextJoin(const std::shared_ptr<MinHashSketch> &current, size_t join_idx,
+                                                 size_t current_n_max, std::vector<double> &match_counts,
+                                                 std::shared_ptr<OmniSketchCell> &result) const {
 	for (auto &item : join_key_matches[join_idx]) {
 		auto intersection = current->Intersect({current, item.cell->GetMinHashSketch()});
 		if (intersection->Size() == 0) {
@@ -45,7 +59,7 @@ void ExhaustiveCombinator::FindMatchesInNextJoin(
 		match_counts[join_idx] += card_est;
 
 		if (join_idx < join_key_matches.size() - 1) {
-			FindMatchesInNextJoin(join_key_matches, intersection, join_idx + 1, current_n_max, match_counts, result);
+			FindMatchesInNextJoin(intersection, join_idx + 1, current_n_max, match_counts, result);
 		} else {
 			OmniSketchCell intersection_cell(std::move(intersection), (size_t)std::round(card_est));
 			result->Combine(intersection_cell);
@@ -67,8 +81,7 @@ std::shared_ptr<OmniSketchCell> ExhaustiveCombinator::ComputeResult(size_t max_o
 	std::vector<double> match_counts(join_key_matches.size());
 	for (auto &join_key_match : join_key_matches.front()) {
 		match_counts[0] += (double)join_key_match.cell->RecordCount();
-		FindMatchesInNextJoin(join_key_matches, join_key_match.cell->GetMinHashSketch(), 1, join_key_match.n_max,
-		                      match_counts, result);
+		FindMatchesInNextJoin(join_key_match.cell->GetMinHashSketch(), 1, join_key_match.n_max, match_counts, result);
 	}
 
 	auto result_card = (double)base_card;
@@ -92,8 +105,8 @@ ExhaustiveCombinator::FilterProbeSet(std::shared_ptr<OmniSketch> omni_sketch,
 
 	std::vector<std::shared_ptr<OmniSketchCell>> matches(omni_sketch->Depth());
 	auto probe_sample_it = probe_sample->GetMinHashSketch()->Iterator();
-	for (size_t probe_idx = 0; probe_idx < probe_sample->SampleCount(); probe_idx++) {
-		const uint64_t hash = probe_sample_it->Next();
+	for (; !probe_sample_it->IsAtEnd(); probe_sample_it->Next()) {
+		const uint64_t hash = probe_sample_it->Current();
 		const auto probe_result = omni_sketch->ProbeHash(hash, matches);
 		size_t probe_card = probe_result->RecordCount();
 
@@ -101,8 +114,7 @@ ExhaustiveCombinator::FilterProbeSet(std::shared_ptr<OmniSketch> omni_sketch,
 			// Intersect with other predicates
 			auto combinator_result = std::make_shared<OmniSketchCell>(probe_result->MaxSampleCount());
 			const size_t n_max = ExhaustiveCombinatorItem::GetNMax(matches);
-			FindMatchesInNextJoin(join_key_matches, probe_result->GetMinHashSketch(), 0, n_max, match_counts,
-			                      combinator_result);
+			FindMatchesInNextJoin(probe_result->GetMinHashSketch(), 0, n_max, match_counts, combinator_result);
 			probe_card = combinator_result->RecordCount();
 		}
 
@@ -155,10 +167,7 @@ void ExhaustiveCombinator::AddUnfilteredRids(std::shared_ptr<OmniSketchCell> rid
 
 void UncorrelatedCombinator::AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,
                                           std::shared_ptr<OmniSketchCell> probe_sample) {
-	if (join_results.empty()) {
-		base_card = omni_sketch->RecordCount();
-	}
-	assert(base_card == omni_sketch->RecordCount());
+	base_card = std::max(base_card, omni_sketch->RecordCount());
 	const auto join_result = omni_sketch->ProbeHashedSet(probe_sample->GetMinHashSketch());
 	const double join_key_sampling_probability = probe_sample->SamplingProbability();
 	const double join_selectivity =
@@ -194,8 +203,8 @@ UncorrelatedCombinator::FilterProbeSet(std::shared_ptr<OmniSketch> omni_sketch,
 	double card_est_sum = 0;
 	std::vector<std::shared_ptr<OmniSketchCell>> matches(omni_sketch->Depth());
 	auto probe_sample_it = probe_sample->GetMinHashSketch()->Iterator();
-	for (size_t probe_idx = 0; probe_idx < probe_sample->SampleCount(); probe_idx++) {
-		const uint64_t hash = probe_sample_it->Next();
+	for (; !probe_sample_it->IsAtEnd(); probe_sample_it->Next()) {
+		const uint64_t hash = probe_sample_it->Current();
 		const auto probe_result = omni_sketch->ProbeHash(hash, matches);
 		sketches_to_intersect.back() = probe_result->GetMinHashSketch();
 		bool has_result = sketches_to_intersect.back()->Size() > 0;

@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "min_hash_sketch_test.hpp"
-#include "include/min_hash_sketch.hpp"
+#include "include/min_hash_sketch/min_hash_sketch.hpp"
 
 using MinHashSketchSet = MinHashSketchTestFixture<omnisketch::MinHashSketchSet>;
 using MinHashSketchVec = MinHashSketchTestFixture<omnisketch::MinHashSketchVector>;

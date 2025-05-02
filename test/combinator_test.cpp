@@ -103,9 +103,8 @@ TEST_F(ExhaustiveCombinator, FilterProbeSet) {
 	const size_t FK_SIDE_ATTRIBUTE_DOMAIN = 100;
 	const size_t PK_SIDE_CARD = 200;
 	auto omni_fk_side = std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(
-	    64, 3, std::make_shared<omnisketch::MurmurHashFunction<size_t>>(),
-	    std::make_shared<omnisketch::MinHashSketchSetFactory>(32), std::make_shared<omnisketch::ProbeAllSum>(),
-	    std::make_shared<omnisketch::BarrettModSplitHashMapper>(64));
+	    64, 3, 32, std::make_shared<omnisketch::MurmurHashFunction<size_t>>(),
+	    std::make_shared<omnisketch::ProbeAllSum>(), std::make_shared<omnisketch::BarrettModSplitHashMapper>(64));
 
 	for (size_t i = 0; i < FK_SIDE_CARD; i++) {
 		omni_fk_side->AddRecord(i % FK_SIDE_ATTRIBUTE_DOMAIN, i);
@@ -126,9 +125,8 @@ TEST_F(ExhaustiveCombinator, FilterProbeSet) {
 	EXPECT_EQ(result->SampleCount(), probe_set->SampleCount() / 2);
 
 	auto omni_fk_side_2 = std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(
-	    64, 3, std::make_shared<omnisketch::MurmurHashFunction<size_t>>(),
-	    std::make_shared<omnisketch::MinHashSketchSetFactory>(32), std::make_shared<omnisketch::ProbeAllSum>(),
-	    std::make_shared<omnisketch::BarrettModSplitHashMapper>(64));
+	    64, 3, 32, std::make_shared<omnisketch::MurmurHashFunction<size_t>>(),
+	    std::make_shared<omnisketch::ProbeAllSum>(), std::make_shared<omnisketch::BarrettModSplitHashMapper>(64));
 
 	for (size_t i = 0; i < FK_SIDE_CARD; i++) {
 		omni_fk_side_2->AddRecord(i % 10, i);
@@ -141,9 +139,8 @@ TEST_F(ExhaustiveCombinator, FilterProbeSet) {
 	EXPECT_GE(result->SampleCount(), probe_set->SampleCount() / 4);
 
 	auto omni_fk_side_3 = std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(
-	    64, 3, std::make_shared<omnisketch::MurmurHashFunction<size_t>>(),
-	    std::make_shared<omnisketch::MinHashSketchSetFactory>(32), std::make_shared<omnisketch::ProbeAllSum>(),
-	    std::make_shared<omnisketch::BarrettModSplitHashMapper>(64));
+	    64, 3, 32, std::make_shared<omnisketch::MurmurHashFunction<size_t>>(),
+	    std::make_shared<omnisketch::ProbeAllSum>(), std::make_shared<omnisketch::BarrettModSplitHashMapper>(64));
 
 	for (size_t i = 0; i < FK_SIDE_CARD; i++) {
 		omni_fk_side_3->AddRecord(i % 8, i);

@@ -18,22 +18,36 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
 endif()
 
 set(SOURCE_FILES
+        src/include/min_hash_sketch/intersect_min_hash_sketches.hpp
+        src/include/min_hash_sketch/min_hash_sketch.hpp
+        src/include/min_hash_sketch/min_hash_sketch_map.hpp
+        src/include/min_hash_sketch/min_hash_sketch_set.hpp
+        src/include/min_hash_sketch/min_hash_sketch_vector.hpp
+
+        src/include/omni_sketch/foreign_sorted_omni_sketch.hpp
+        src/include/omni_sketch/omni_sketch.hpp
+        src/include/omni_sketch/omni_sketch_cell.hpp
+        src/include/omni_sketch/pre_joined_omni_sketch.hpp
+        src/include/omni_sketch/standard_omni_sketch.hpp
+
+        src/include/util/hash.hpp
+        src/include/util/value.hpp
+
         src/include/combinator.hpp
         src/include/csv_importer.hpp
-        src/include/hash.hpp
-        src/include/min_hash_sketch.hpp
-        src/include/omni_sketch.hpp
-        src/include/omni_sketch_cell.hpp
         src/include/plan_generator.hpp
         src/include/registry.hpp
         src/include/set_membership.hpp
-        src/include/value.hpp
+
+        src/min_hash_sketch/min_hash_sketch_map.cpp
+        src/min_hash_sketch/min_hash_sketch_set.cpp
+        src/min_hash_sketch/min_hash_sketch_vector.cpp
+
+        src/omni_sketch/omni_sketch.cpp
+        src/omni_sketch/omni_sketch_cell.cpp
 
         src/combinator.cpp
         src/csv_importer.cpp
-        src/min_hash_sketch.cpp
-        src/omni_sketch.cpp
-        src/omni_sketch_cell.cpp
         src/plan_generator.cpp
         src/registry.cpp
 )

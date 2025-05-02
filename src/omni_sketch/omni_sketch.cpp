@@ -1,25 +1,28 @@
-#include "omni_sketch.hpp"
+#include "omni_sketch/omni_sketch.hpp"
+
+#include "omni_sketch/omni_sketch_cell.hpp"
+#include "util/hash.hpp"
 
 namespace omnisketch {
 
-PointOmniSketch::PointOmniSketch(size_t width_p, size_t depth_p,
-                                 std::shared_ptr<MinHashSketchFactory> min_hash_sketch_factory_p,
+PointOmniSketch::PointOmniSketch(size_t width_p, size_t depth_p, size_t max_sample_count_p,
                                  std::shared_ptr<SetMembershipAlgorithm> set_membership_algo_p,
-                                 std::shared_ptr<CellIdxMapper> hash_processor_p)
-    : width(width_p), depth(depth_p), min_hash_sketch_factory(std::move(min_hash_sketch_factory_p)),
+                                 std::shared_ptr<CellIdxMapper> hash_processor_p,
+                                 const std::shared_ptr<MinHashSketch::SketchFactory> &factory)
+    : width(width_p), depth(depth_p), max_sample_count(max_sample_count_p),
       set_membership_algo(std::move(set_membership_algo_p)), hash_processor(std::move(hash_processor_p)) {
 	cells.resize(depth);
 	for (auto &row : cells) {
 		row.reserve(width);
 		for (size_t col_idx = 0; col_idx < width; col_idx++) {
-			row.emplace_back(std::make_shared<OmniSketchCell>(min_hash_sketch_factory->Create()));
+			row.emplace_back(std::make_shared<OmniSketchCell>(factory->Create(max_sample_count)));
 		}
 	}
 }
 
 PointOmniSketch::PointOmniSketch(size_t width, size_t depth, size_t max_sample_count_p)
-    : PointOmniSketch(width, depth, std::make_shared<MinHashSketchSetFactory>(max_sample_count_p),
-                      std::make_shared<ProbeAllSum>(), std::make_shared<BarrettModSplitHashMapper>(width)) {
+    : PointOmniSketch(width, depth, max_sample_count_p, std::make_shared<ProbeAllSum>(),
+                      std::make_shared<BarrettModSplitHashMapper>(width)) {
 }
 
 void PointOmniSketch::AddValueRecord(const Value &value, uint64_t record_id) {
@@ -38,6 +41,7 @@ std::shared_ptr<OmniSketchCell> PointOmniSketch::ProbeValue(const Value &value) 
 	return ProbeHash(value.GetHash(), matches);
 }
 
+// TODO(perf): use raw pointers for matches -> no more shared_ptr count increment
 std::shared_ptr<OmniSketchCell>
 PointOmniSketch::ProbeHash(uint64_t hash, std::vector<std::shared_ptr<OmniSketchCell>> &matches) const {
 	assert(matches.size() == depth);
@@ -57,7 +61,8 @@ std::shared_ptr<OmniSketchCell> PointOmniSketch::ProbeHashedSet(const std::share
 
 	auto value_it = values->Iterator();
 	for (size_t value_idx = 0; value_idx < values->Size(); value_idx++) {
-		const uint64_t hash = value_it->Next();
+		const uint64_t hash = value_it->Current();
+		value_it->Next();
 		hash_processor->SetHash(hash);
 		for (size_t row_idx = 0; row_idx < depth; row_idx++) {
 			const size_t col_idx = hash_processor->ComputeCellIdx(row_idx);
@@ -65,7 +70,7 @@ std::shared_ptr<OmniSketchCell> PointOmniSketch::ProbeHashedSet(const std::share
 		}
 	}
 
-	return set_membership_algo->Execute(min_hash_sketch_factory, matches);
+	return set_membership_algo->Execute(max_sample_count, matches);
 }
 
 std::shared_ptr<OmniSketchCell> PointOmniSketch::ProbeHashedSet(const std::shared_ptr<OmniSketchCell> &values) const {
@@ -85,7 +90,7 @@ std::shared_ptr<OmniSketchCell> PointOmniSketch::ProbeValueSet(const ValueSet &v
 		}
 	}
 
-	return set_membership_algo->Execute(min_hash_sketch_factory, matches);
+	return set_membership_algo->Execute(max_sample_count, matches);
 }
 
 void PointOmniSketch::Flatten() {
@@ -118,7 +123,7 @@ size_t PointOmniSketch::Width() const {
 }
 
 size_t PointOmniSketch::MinHashSketchSize() const {
-	return min_hash_sketch_factory->MaxSampleCount();
+	return max_sample_count;
 }
 
 std::shared_ptr<OmniSketchCell> PointOmniSketch::GetRids() const {
@@ -128,7 +133,7 @@ std::shared_ptr<OmniSketchCell> PointOmniSketch::GetRids() const {
 void PointOmniSketch::Combine(const std::shared_ptr<OmniSketch> &other) {
 	assert(other->Depth() == depth);
 	assert(other->Width() == width);
-	assert(other->MinHashSketchSize() == min_hash_sketch_factory->MaxSampleCount());
+	assert(other->MinHashSketchSize() == max_sample_count);
 
 	for (size_t row_idx = 0; row_idx < depth; row_idx++) {
 		for (size_t col_idx = 0; col_idx < width; col_idx++) {

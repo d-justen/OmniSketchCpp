@@ -25,15 +25,15 @@ BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, PointQuery, 1, 1, 1)
 	auto sample_count = static_cast<size_t>(state.range());
 
 	omnisketch::OmniSketchConfig config;
-	config.SetSampleCount(sample_count);
+	config.sample_count = sample_count;
 	config.SetWidth(WIDTH);
 	config.depth = DEPTH;
 	config.hash_processor = std::make_shared<omnisketch::BarrettModSplitHashMapper>(WIDTH);
 	omni_sketch = std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(
-	    config.width, config.depth, std::make_shared<omnisketch::MurmurHashFunction<size_t>>(),
-	    config.min_hash_sketch_factory, config.set_membership_algo, config.hash_processor);
+	    config.width, config.depth, config.sample_count, std::make_shared<omnisketch::MurmurHashFunction<size_t>>(),
+	    config.set_membership_algo, config.hash_processor);
 
-	const size_t target_record_count =  WIDTH * sample_count * 8;
+	const size_t target_record_count = WIDTH * sample_count * 8;
 	const size_t attribute_values = WIDTH * 64;
 	const size_t multiplicity = target_record_count / attribute_values;
 	FillOmniSketch(attribute_values, multiplicity);
@@ -56,17 +56,17 @@ BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, PointQueryFlattened, 1, 1, 1)
 	auto sample_count = static_cast<size_t>(state.range());
 
 	omnisketch::OmniSketchConfig config;
-	config.SetSampleCount(sample_count);
+	config.sample_count = sample_count;
 	config.SetWidth(WIDTH);
 	config.depth = DEPTH;
 	config.hash_processor = std::make_shared<omnisketch::BarrettModSplitHashMapper>(WIDTH);
 	omni_sketch = std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(
-	    config.width, config.depth, std::make_shared<omnisketch::MurmurHashFunction<size_t>>(),
-	    config.min_hash_sketch_factory, config.set_membership_algo, config.hash_processor);
+	    config.width, config.depth, config.sample_count, std::make_shared<omnisketch::MurmurHashFunction<size_t>>(),
+	    config.set_membership_algo, config.hash_processor);
 
 	omni_sketch->Flatten();
 
-	const size_t target_record_count =  WIDTH * sample_count * 8;
+	const size_t target_record_count = WIDTH * sample_count * 8;
 	const size_t attribute_values = WIDTH * 64;
 	const size_t multiplicity = target_record_count / attribute_values;
 	FillOmniSketch(attribute_values, multiplicity);

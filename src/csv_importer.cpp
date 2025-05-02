@@ -1,18 +1,52 @@
 #include "csv_importer.hpp"
 
+#include "registry.hpp"
+
 namespace omnisketch {
 
 void CSVImporter::ImportTable(const std::string &path, const std::string &table_name,
-                              const std::vector<std::string> &column_names, std::vector<ColumnType> types,
-                              const OmniSketchConfig config) {
+                              const std::vector<std::string> &column_names,
+                              const std::vector<std::string> &referencing_table_names,
+                              const std::vector<std::string> &referencing_column_names,
+                              const std::vector<ColumnType> &types, const OmniSketchConfig &config) {
 	std::vector<OmniSketchConfig> configs(column_names.size(), config);
-	ImportTable(path, table_name, column_names, types, configs);
+	ImportTable(path, table_name, column_names, referencing_table_names, referencing_column_names, types, configs);
+}
+
+template <typename T>
+std::function<void(const std::string &, const size_t)>
+CreateExtendingSketchAndFunc(const std::string &table_name, const std::string &column_name,
+                             const std::vector<std::string> &referencing_table_names,
+                             const std::vector<std::string> &referencing_column_names, const OmniSketchConfig &config) {
+	auto &registry = Registry::Get();
+
+	registry.CreateOmniSketch<T>(table_name, column_name, config);
+	if (!config.referencing_type) {
+		return CSVImporter::CreateInsertFunc<T>(table_name, column_name);
+	}
+	if (*config.referencing_type == OmniSketchType::PRE_JOINED) {
+		for (size_t i = 0; i < referencing_table_names.size(); i++) {
+			registry.CreateExtendingOmniSketch<PreJoinedOmniSketch<T>, T>(
+			    table_name, column_name, referencing_table_names[i], referencing_column_names[i], config);
+		}
+		return CSVImporter::CreateInsertFunc<T, PreJoinedOmniSketch<T>>(table_name, column_name,
+		                                                                referencing_table_names);
+	} else {
+		assert(*config.referencing_type == OmniSketchType::FOREIGN_SORTED);
+		for (size_t i = 0; i < referencing_table_names.size(); i++) {
+			registry.CreateExtendingOmniSketch<ForeignSortedOmniSketch<T>, T>(
+			    table_name, column_name, referencing_table_names[i], referencing_column_names[i], config);
+		}
+		return CSVImporter::CreateInsertFunc<T, ForeignSortedOmniSketch<T>>(table_name, column_name,
+		                                                                    referencing_table_names);
+	}
 }
 
 void CSVImporter::ImportTable(const std::string &path, const std::string &table_name,
-                              const std::vector<std::string> &column_names, std::vector<ColumnType> types,
-                              std::vector<OmniSketchConfig> configs) {
-	auto &registry = Registry::Get();
+                              const std::vector<std::string> &column_names,
+                              const std::vector<std::string> &referencing_table_names,
+                              const std::vector<std::string> &referencing_column_names,
+                              const std::vector<ColumnType> &types, std::vector<OmniSketchConfig> configs) {
 	assert(types.size() == column_names.size());
 	assert(types.size() == configs.size());
 	assert(types.size() > 1);
@@ -25,43 +59,23 @@ void CSVImporter::ImportTable(const std::string &path, const std::string &table_
 	for (size_t i = 1; i < column_names.size(); i++) {
 		switch (types[i]) {
 		case ColumnType::INT: {
-			auto sketch = registry.CreateOmniSketch<int32_t>(table_name, column_names[i], configs[i]);
-			insert_funcs.emplace_back([sketch](const std::string &val, const size_t rid) {
-				if (val.empty()) {
-					return sketch->AddNullValues(1);
-				}
-				sketch->AddRecord(std::stoi(val), rid);
-			});
+			insert_funcs.emplace_back(CreateExtendingSketchAndFunc<int32_t>(
+			    table_name, column_names[i], referencing_table_names, referencing_column_names, configs[i]));
 			break;
 		}
 		case ColumnType::UINT: {
-			auto sketch = registry.CreateOmniSketch<size_t>(table_name, column_names[i], configs[i]);
-			insert_funcs.emplace_back([sketch](const std::string &val, const size_t rid) {
-				if (val.empty()) {
-					return sketch->AddNullValues(1);
-				}
-				sketch->AddRecord(std::stoul(val), rid);
-			});
+			insert_funcs.emplace_back(CreateExtendingSketchAndFunc<uint64_t>(
+			    table_name, column_names[i], referencing_table_names, referencing_column_names, configs[i]));
 			break;
 		}
 		case ColumnType::DOUBLE: {
-			auto sketch = registry.CreateOmniSketch<double>(table_name, column_names[i], configs[i]);
-			insert_funcs.emplace_back([sketch](const std::string &val, const size_t rid) {
-				if (val.empty()) {
-					return sketch->AddNullValues(1);
-				}
-				sketch->AddRecord(std::stod(val), rid);
-			});
+			insert_funcs.emplace_back(CreateExtendingSketchAndFunc<double>(
+			    table_name, column_names[i], referencing_table_names, referencing_column_names, configs[i]));
 			break;
 		}
 		case ColumnType::VARCHAR: {
-			auto sketch = registry.CreateOmniSketch<std::string>(table_name, column_names[i], configs[i]);
-			insert_funcs.emplace_back([sketch](const std::string &val, const size_t rid) {
-				if (val.empty()) {
-					return sketch->AddNullValues(1);
-				}
-				sketch->AddRecord(val, rid);
-			});
+			insert_funcs.emplace_back(CreateExtendingSketchAndFunc<std::string>(
+			    table_name, column_names[i], referencing_table_names, referencing_column_names, configs[i]));
 			break;
 		}
 		}
@@ -79,13 +93,32 @@ void CSVImporter::ImportTable(const std::string &path, const std::string &table_
 	table_stream.close();
 }
 
+std::pair<std::vector<std::string>, std::vector<std::string>>
+CSVImporter::ExtractReferencingTables(const std::string &input) {
+	if (input.empty()) {
+		return {};
+	}
+	const auto referencing_table_identifiers = Split(input);
+	std::vector<std::string> referencing_table_names;
+	std::vector<std::string> referencing_column_names;
+	referencing_table_names.reserve(referencing_table_identifiers.size());
+	referencing_column_names.reserve(referencing_column_names.size());
+	for (auto &id : referencing_table_identifiers) {
+		auto tbl_compound = Split(id, '.');
+		assert(tbl_compound.size() == 2);
+		referencing_table_names.push_back(tbl_compound[0]);
+		referencing_column_names.push_back(tbl_compound[1]);
+	}
+	return {referencing_table_names, referencing_column_names};
+}
+
 void CSVImporter::ImportTables(const std::string &path_to_definition_file) {
 	std::ifstream table_stream(path_to_definition_file);
 	std::string line;
 
 	while (std::getline(table_stream, line)) {
 		auto tokens = Split(line, '|');
-		assert(tokens.size() == 3);
+		assert(tokens.size() == 3 || tokens.size() == 5);
 		auto vals = Split(tokens[0]);
 		const auto data_path = vals[0];
 		const size_t width = std::stoul(vals[1]);
@@ -112,10 +145,24 @@ void CSVImporter::ImportTables(const std::string &path_to_definition_file) {
 			}
 		}
 
+		std::pair<std::vector<std::string>, std::vector<std::string>> referencing_table_ids;
+		std::shared_ptr<OmniSketchType> reference_type;
+		if (tokens.size() == 5) {
+			referencing_table_ids = ExtractReferencingTables(tokens[4]);
+			if (tokens[3] == "P") {
+				reference_type = std::make_shared<OmniSketchType>(OmniSketchType::PRE_JOINED);
+			} else {
+				assert(tokens[3] == "F");
+				reference_type = std::make_shared<OmniSketchType>(OmniSketchType::FOREIGN_SORTED);
+			}
+		}
+
 		OmniSketchConfig config;
 		config.SetWidth(width);
-		config.SetSampleCount(max_sample_count);
-		ImportTable(data_path, table_name, column_names, data_types, config);
+		config.sample_count = max_sample_count;
+		config.referencing_type = reference_type;
+		ImportTable(data_path, table_name, column_names, referencing_table_ids.first, referencing_table_ids.second,
+		            data_types, config);
 	}
 }
 
@@ -209,7 +256,8 @@ std::shared_ptr<OmniSketchCell> ConvertSet(const std::string &table_name, const 
 	throw std::logic_error("Data type not supported");
 }
 
-std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_query_file, const std::shared_ptr<OmniSketchCombinator>& combinator) {
+std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_query_file,
+                                                   const std::shared_ptr<OmniSketchCombinator> &combinator) {
 	std::ifstream query_stream(path_to_query_file);
 	std::string line;
 
@@ -305,6 +353,9 @@ std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_qu
 }
 
 std::vector<std::string> CSVImporter::Split(const std::string &line, char sep) {
+	if (line.empty()) {
+		return {};
+	}
 	std::vector<std::string> tokens;
 	std::stringstream ss(line);
 	std::string token;
@@ -314,6 +365,26 @@ std::vector<std::string> CSVImporter::Split(const std::string &line, char sep) {
 	}
 
 	return tokens;
+}
+
+template <>
+std::string CSVImporter::ConvertString<std::string>(const std::string &in) {
+	return in;
+}
+
+template <>
+int32_t CSVImporter::ConvertString<int32_t>(const std::string &in) {
+	return std::stoi(in);
+}
+
+template <>
+size_t CSVImporter::ConvertString<size_t>(const std::string &in) {
+	return std::stoul(in);
+}
+
+template <>
+double CSVImporter::ConvertString<double>(const std::string &in) {
+	return std::stod(in);
 }
 
 } // namespace omnisketch

@@ -1,4 +1,6 @@
-#include "include/omni_sketch_cell.hpp"
+#include "omni_sketch/omni_sketch_cell.hpp"
+
+#include "min_hash_sketch/min_hash_sketch_set.hpp"
 
 namespace omnisketch {
 
@@ -10,8 +12,8 @@ OmniSketchCell::OmniSketchCell(std::shared_ptr<MinHashSketch> min_hash_sketch_p)
     : OmniSketchCell(std::move(min_hash_sketch_p), 0) {
 }
 
-OmniSketchCell::OmniSketchCell(size_t max_sample_count)
-    : OmniSketchCell(std::make_shared<MinHashSketchSet>(max_sample_count)) {
+OmniSketchCell::OmniSketchCell(size_t max_sample_count_p)
+    : OmniSketchCell(std::make_shared<MinHashSketchSet>(max_sample_count_p), 0) {
 }
 
 OmniSketchCell::OmniSketchCell() : OmniSketchCell(std::make_shared<MinHashSketchSet>(0)) {
@@ -68,6 +70,7 @@ size_t OmniSketchCell::EstimateByteSize() const {
 
 std::shared_ptr<OmniSketchCell> OmniSketchCell::Intersect(const std::vector<std::shared_ptr<OmniSketchCell>> &cells) {
 	assert(!cells.empty());
+	// TODO(perf): re-use vectors or operate on min-hash sketches directly
 	std::vector<std::shared_ptr<MinHashSketch>> sketches;
 	sketches.reserve(cells.size());
 

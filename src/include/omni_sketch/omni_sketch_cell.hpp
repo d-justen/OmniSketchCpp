@@ -1,14 +1,12 @@
 #pragma once
 
-#include "min_hash_sketch.hpp"
+#include "min_hash_sketch/min_hash_sketch.hpp"
 
 #include <cstddef>
 #include <cstdint>
 #include <set>
 
 namespace omnisketch {
-
-enum class CellType { SET, VECTOR };
 
 class OmniSketchCell {
 public:

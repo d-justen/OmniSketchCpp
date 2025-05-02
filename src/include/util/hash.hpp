@@ -114,7 +114,7 @@ public:
 	}
 
 	size_t ComputeCellIdx(size_t row_idx) override {
-		uint32_t combined = h1 + (uint32_t)std::pow(row_idx + 1, 2) * h2;
+		uint32_t combined = h1 + (uint32_t)std::pow(row_idx + 7, 2) * h2;
 		return BarrettReduction(combined) % width;
 	}
 

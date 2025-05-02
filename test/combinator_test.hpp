@@ -1,7 +1,9 @@
 #pragma once
 
 #include <gtest/gtest.h>
-#include "include/combinator.hpp"
+#include "combinator.hpp"
+#include "min_hash_sketch/min_hash_sketch_set.hpp"
+#include "omni_sketch/standard_omni_sketch.hpp"
 
 static constexpr size_t WIDTH = 16;
 static constexpr size_t DEPTH = 3;
