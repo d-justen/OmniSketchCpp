@@ -1,0 +1,28 @@
+{
+  "context": {
+    "date": "2025-05-02T12:00:00Z",
+    "num_cpus": 8,
+    "mhz_per_cpu": 2300,
+    "cpu_scaling_enabled": false
+  },
+  "benchmarks": [
+    {
+      "name": "BM_PushBack/1024",
+      "real_time": 1200,
+      "cpu_time": 1150,
+      "iterations": 10000
+    },
+    {
+      "name": "BM_PushBack/2048",
+      "real_time": 2200,
+      "cpu_time": 2100,
+      "iterations": 8000
+    },
+    {
+      "name": "BM_PushBack/4096",
+      "real_time": 4300,
+      "cpu_time": 4200,
+      "iterations": 6000
+    }
+  ]
+}

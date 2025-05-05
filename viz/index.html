@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Micro-Benchmark Viewer</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="container">
+    <h1>Micro-Benchmark Viewer</h1>
+    <label for="benchmark-select">Benchmark:</label>
+    <select id="benchmark-select">
+        <option value="">Select Benchmark</option>
+    </select>
+
+    <label for="iteration-select">Iteration:</label>
+    <select id="iteration-select">
+        <option value="">Select Iteration</option>
+    </select>
+
+    <div id="chart-container">
+        <canvas id="benchmarkChart"></canvas>
+    </div>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
