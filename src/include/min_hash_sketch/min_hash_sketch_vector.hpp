@@ -105,9 +105,12 @@ public:
 	const std::vector<uint64_t> &Data() const;
 
 private:
+	void ShrinkToFit();
+
 	std::vector<uint64_t> data;
 	ValidityMask validity;
 	size_t max_count;
+	static constexpr double SHRINK_TO_FIT_THRESHOLD = 1.0 / 8.0;
 };
 
 } // namespace omnisketch
