@@ -43,6 +43,7 @@ public:
 	}
 
 	void AddRecord(uint64_t hash) override;
+	void EraseRecord(uint64_t hash) override;
 	size_t Size() const override;
 	size_t MaxCount() const override;
 	std::shared_ptr<MinHashSketch> Resize(size_t size) const override;

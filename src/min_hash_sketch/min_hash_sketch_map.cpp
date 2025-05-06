@@ -116,4 +116,14 @@ const std::set<uint64_t> &MinHashSketchMap::Data() const {
 	return data;
 }
 
+void MinHashSketchMap::EraseRecord(uint64_t hash) {
+	for (auto it = hash_index.begin(); it != hash_index.end(); ++it) {
+		if (*it->second == hash) {
+			data.erase(it->second);
+			hash_index.erase(it);
+			return;
+		}
+	}
+}
+
 } // namespace omnisketch

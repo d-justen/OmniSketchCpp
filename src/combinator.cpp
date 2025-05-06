@@ -53,6 +53,10 @@ void ExhaustiveCombinator::FindMatchesInNextJoin(const std::shared_ptr<MinHashSk
 			continue;
 		}
 
+		for (auto it = intersection->Iterator(); !it->IsAtEnd(); it->Next()) {
+			current->EraseRecord(it->Current());
+		}
+
 		current_n_max = std::max(current_n_max, item.n_max);
 		double card_est = ((double)current_n_max / (double)max_sample_count) * (double)intersection->Size();
 		card_est = std::max(card_est, (double)intersection->Size());
@@ -63,6 +67,11 @@ void ExhaustiveCombinator::FindMatchesInNextJoin(const std::shared_ptr<MinHashSk
 		} else {
 			OmniSketchCell intersection_cell(std::move(intersection), (size_t)std::round(card_est));
 			result->Combine(intersection_cell);
+		}
+
+		if (current->Size() == 0) {
+			// All hashes processed
+			return;
 		}
 	}
 }

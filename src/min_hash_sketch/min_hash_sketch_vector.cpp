@@ -110,4 +110,8 @@ const std::vector<uint64_t> &MinHashSketchVector::Data() const {
 	return data;
 }
 
+void MinHashSketchVector::EraseRecord(uint64_t hash) {
+	data.erase(std::find(data.begin(), data.end(), hash));
+}
+
 } // namespace omnisketch

@@ -137,4 +137,8 @@ const std::set<uint64_t> &MinHashSketchSet::Data() const {
 	return data;
 }
 
+void MinHashSketchSet::EraseRecord(uint64_t hash) {
+	data.erase(hash);
+}
+
 } // namespace omnisketch
