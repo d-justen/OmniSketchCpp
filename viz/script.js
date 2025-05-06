@@ -3,14 +3,6 @@ const iterationSelect = document.getElementById('iteration-select');
 const chartContainer = document.getElementById("chart-container");
 let chartInstance = null;
 
-function median(arr) {
-    const sorted = arr.slice().sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 !== 0
-        ? sorted[mid]
-        : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-
 // Load benchmark directories
 async function loadBenchmarks() {
     const response = await fetch('benchmark_results/');
@@ -44,7 +36,7 @@ async function loadIterations(benchmarkDir) {
     // Add "Combined" option
     const combinedOption = document.createElement('option');
     combinedOption.value = '__combined__';
-    combinedOption.textContent = 'Combined (Median per Iteration)';
+    combinedOption.textContent = 'Trend (TET)';
     iterationSelect.appendChild(combinedOption);
 
     // Add individual files
@@ -52,7 +44,14 @@ async function loadIterations(benchmarkDir) {
     files.forEach(file => {
         const option = document.createElement('option');
         option.value = file;
-        option.textContent = file;
+        const l_year = file.substring(2, 4);
+        const l_month = file.substring(4, 6);
+        const l_day = file.substring(6, 8);
+        const l_hour = file.substring(9, 11);
+        const l_minute = file.substring(11, 13);
+        const l_second = file.substring(13, 15);
+        const commit_hash = file.split(".")[0].split("_")[2];
+        option.textContent = `${l_day}.${l_month}.${l_year} ${l_hour}:${l_minute}:${l_second} [${commit_hash}]`;
         iterationSelect.appendChild(option);
         if (file === last_iteration_select) {
             has_last_selection = true;
