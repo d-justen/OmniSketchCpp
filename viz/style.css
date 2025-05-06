@@ -1,7 +1,7 @@
 body {
     font-family: sans-serif;
     padding: 20px;
-    max-width: 900px;
+    max-width: 1400px;
     margin: auto;
 }
 
@@ -16,11 +16,11 @@ body {
 
 #chart-container {
     width: 100%;
-    max-width: 800px;
+    /*max-width: 800px;*/
 }
 
 canvas {
-    width: 100% !important;
-    height: auto !important;
+    /*width: 100% !important;
+    height: auto !important;*/
     display: block;
 }

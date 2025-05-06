@@ -83,7 +83,7 @@ double PlanGenerator::EstimateCardinality() const {
 				auto probes_into_item = exec_items.find(probes_into_table_name)->second;
 				auto referencing_sketch =
 				    registry.FindReferencingOmniSketch(table_name, column_name, plan_item->probes_into.begin()->first);
-				if (referencing_sketch) {
+				if (referencing_sketch && use_referencing_sketches) {
 					if (referencing_sketch->Type() == OmniSketchType::FOREIGN_SORTED) {
 						auto &probes_into_sketch = exec_item->probes_into.begin()->second;
 						probes_into_item->combinator->AddPredicate(probes_into_sketch,

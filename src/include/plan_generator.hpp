@@ -23,7 +23,9 @@ struct PlanExecItem {
 class PlanGenerator {
 public:
 	explicit PlanGenerator(
-	    const std::shared_ptr<OmniSketchCombinator> &combinator = std::make_shared<ExhaustiveCombinator>()) {
+	    const std::shared_ptr<OmniSketchCombinator> &combinator = std::make_shared<ExhaustiveCombinator>(),
+	    bool use_referencing_sketches_p = false)
+	    : use_referencing_sketches(use_referencing_sketches_p) {
 		if (std::dynamic_pointer_cast<ExhaustiveCombinator>(combinator)) {
 			combinator_creator = []() {
 				return std::make_shared<ExhaustiveCombinator>();
@@ -45,6 +47,7 @@ protected:
 	bool CheckIfResolvable(const std::shared_ptr<PlanExecItem> &item) const;
 	std::unordered_map<std::string, std::shared_ptr<PlanItem>> plan_items;
 	std::function<std::shared_ptr<OmniSketchCombinator>()> combinator_creator;
+	bool use_referencing_sketches = false;
 };
 
 } // namespace omnisketch

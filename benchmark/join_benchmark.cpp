@@ -284,13 +284,13 @@ static void SSBSkewSubArgs(benchmark::internal::Benchmark *b) {
 	}
 }
 
-BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBU)->ArgsProduct({AllSSBQueries()})->Iterations(1);
-BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBE)->ArgsProduct({AllSSBQueries()})->Iterations(1);
-BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewU)->ArgsProduct({AllSSBQueries()})->Iterations(1);
-BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewE)->ArgsProduct({AllSSBQueries()})->Iterations(1);
-BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewSubU)->Apply(SSBSkewSubArgs)->Iterations(1);
-BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewSubE)->Apply(SSBSkewSubArgs)->Iterations(1);
-BENCHMARK_REGISTER_F(JoinBenchmarkFixture, JOBLightU)->ArgsProduct({AllJOBLightQueries()})->Iterations(1);
-BENCHMARK_REGISTER_F(JoinBenchmarkFixture, JOBLightE)->ArgsProduct({AllJOBLightQueries()})->Iterations(1);
+BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBU)->ArgsProduct({AllSSBQueries()})->Iterations(5);
+BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBE)->ArgsProduct({AllSSBQueries()})->Iterations(5);
+BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewU)->ArgsProduct({AllSSBQueries()})->Iterations(5);
+BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewE)->ArgsProduct({AllSSBQueries()})->Iterations(5);
+BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewSubU)->Apply(SSBSkewSubArgs)->Iterations(5);
+BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewSubE)->Apply(SSBSkewSubArgs)->Iterations(5);
+BENCHMARK_REGISTER_F(JoinBenchmarkFixture, JOBLightU)->ArgsProduct({AllJOBLightQueries()})->Iterations(5);
+BENCHMARK_REGISTER_F(JoinBenchmarkFixture, JOBLightE)->ArgsProduct({AllJOBLightQueries()})->Iterations(5);
 
 BENCHMARK_MAIN();

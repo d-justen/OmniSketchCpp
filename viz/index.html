@@ -9,18 +9,19 @@
 <body>
 <div class="container">
     <h1>Micro-Benchmark Viewer</h1>
-    <label for="benchmark-select">Benchmark:</label>
-    <select id="benchmark-select">
-        <option value="">Select Benchmark</option>
-    </select>
+    <div id="controls">
+        <label for="benchmark-select">Benchmark:</label>
+        <select id="benchmark-select">
+            <option value="">Select Benchmark</option>
+        </select>
 
-    <label for="iteration-select">Iteration:</label>
-    <select id="iteration-select">
-        <option value="">Select Iteration</option>
-    </select>
+        <label for="iteration-select">Iteration:</label>
+        <select id="iteration-select">
+            <option value="">Select Iteration</option>
+        </select>
+    </div>
 
     <div id="chart-container">
-        <canvas id="benchmarkChart"></canvas>
     </div>
 </div>
 <script src="script.js"></script>

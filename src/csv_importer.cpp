@@ -64,7 +64,7 @@ void CSVImporter::ImportTable(const std::string &path, const std::string &table_
 			break;
 		}
 		case ColumnType::UINT: {
-			insert_funcs.emplace_back(CreateExtendingSketchAndFunc<uint64_t>(
+			insert_funcs.emplace_back(CreateExtendingSketchAndFunc<size_t>(
 			    table_name, column_names[i], referencing_table_names, referencing_column_names, configs[i]));
 			break;
 		}
@@ -385,6 +385,11 @@ size_t CSVImporter::ConvertString<size_t>(const std::string &in) {
 template <>
 double CSVImporter::ConvertString<double>(const std::string &in) {
 	return std::stod(in);
+}
+
+template <>
+uint64_t CSVImporter::ConvertString<uint64_t>(const std::string &in) {
+	return std::stoull(in);
 }
 
 } // namespace omnisketch

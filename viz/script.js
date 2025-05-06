@@ -1,6 +1,6 @@
 const benchmarkSelect = document.getElementById('benchmark-select');
 const iterationSelect = document.getElementById('iteration-select');
-const chartCanvas = document.getElementById('benchmarkChart');
+const chartContainer = document.getElementById("chart-container");
 let chartInstance = null;
 
 function median(arr) {
@@ -21,7 +21,7 @@ async function loadBenchmarks() {
         .filter(name => name.endsWith('/') && name !== '../');
     dirs.forEach(dir => {
         const option = document.createElement('option');
-        option.value = dir;
+        option.value = dir.replace('/', '');
         option.textContent = dir.replace('/', '');
         benchmarkSelect.appendChild(option);
     });
@@ -29,6 +29,7 @@ async function loadBenchmarks() {
 
 // Load iterations (JSON files) for a selected benchmark
 async function loadIterations(benchmarkDir) {
+    const last_iteration_select = iterationSelect.value;
     iterationSelect.innerHTML = '';
 
     const response = await fetch(`benchmark_results/${benchmarkDir}`);
@@ -47,12 +48,20 @@ async function loadIterations(benchmarkDir) {
     iterationSelect.appendChild(combinedOption);
 
     // Add individual files
+    let has_last_selection = false;
     files.forEach(file => {
         const option = document.createElement('option');
         option.value = file;
         option.textContent = file;
         iterationSelect.appendChild(option);
+        if (file === last_iteration_select) {
+            has_last_selection = true;
+        }
     });
+
+    if (has_last_selection) {
+        iterationSelect.value = last_iteration_select;
+    }
 
     // Automatically trigger the plot for the default (Combined) selection
     const benchmark = benchmarkSelect.value;
@@ -76,7 +85,7 @@ async function plotBenchmark(benchmark, iterationFile) {
     const labels = data.benchmarks.map(b => b.name);
     const values = data.benchmarks.map(b => b.real_time);
 
-    renderChart(labels, values, `Benchmark: ${iterationFile}`);
+    renderChart(benchmark, data);
 }
 
 async function plotCombinedBenchmark(benchmark) {
@@ -90,46 +99,296 @@ async function plotCombinedBenchmark(benchmark) {
         .sort();
 
     const labels = [];
-    const medianValues = [];
+    const total_times = [];
 
     for (const file of files) {
         const res = await fetch(`benchmark_results/${benchmark}/${file}`);
         const data = await res.json();
-        const times = data.benchmarks.map(b => b.real_time);
-        if (times.length > 0) {
-            labels.push(file);
-            medianValues.push(median(times));
-        }
+        const total_time = data.benchmarks.map(b => b.real_time / 1000000).reduce((sum, n) => sum + n);
+
+        const l_year = file.substring(2, 4);
+        const l_month = file.substring(5, 6);
+        const l_day = file.substring(7, 8);
+        const commit_hash = file.split(".")[0].split("_")[2];
+
+        labels.push(`${l_day}.${l_month}.${l_year} [${commit_hash}]`);
+        total_times.push(total_time);
     }
 
-    renderChart(labels, medianValues, 'Benchmark: Median per Iteration');
-}
-
-// Draw chart
-function renderChart(labels, values, label) {
+    chartContainer.innerHTML = "";
     if (chartInstance) chartInstance.destroy();
+    const canvas = document.createElement("canvas");
+    chartContainer.appendChild(canvas);
 
-    chartInstance = new Chart(chartCanvas, {
-        type: 'line',
+    chartInstance = new Chart(canvas, {
+        type: 'bar',
         data: {
             labels: labels,
             datasets: [{
-                label: label,
-                data: values,
+                label: "Total Execution Time",
+                data: total_times,
                 fill: false,
-                borderColor: 'green',
-                tension: 0.1
+                backgroundColor: "rgba(54, 162, 235, 0.2)",
+                borderColor: 'rgb(54, 162, 235)',
+                borderWidth: 1
             }]
         },
         options: {
             responsive: true,
             scales: {
-                y: {
+                x: {
                     title: {
                         display: true,
-                        text: 'Real Time (ns)'
+                        text: "Experiment ID"
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: "Latency (ms)"
                     }
                 }
+            }
+        }
+    });
+}
+
+// Draw chart
+function renderChart(benchmark, data) {
+    chartContainer.innerHTML = "";
+    if (chartInstance) chartInstance.destroy();
+
+    if (benchmark.includes("min_hash")) {
+        renderMinHashChart(data);
+        return;
+    }
+    if (benchmark === "omni_insert") {
+        renderOmniInsertChart(data);
+        return;
+    }
+    if (benchmark === "omni_probe") {
+        renderOmniProbeChart(data);
+        return;
+    }
+    if (benchmark === "ssb") {
+        renderSSBCharts(data);
+    }
+}
+
+function renderMinHashChart(data) {
+    const labels = data.benchmarks.filter(b => b.name.includes("Tree")).map(b => Number(b.name.split("/")[2]));
+    const tree_vals = data.benchmarks.filter(b => b.name.includes("Tree")).map(b => b.real_time / 1000000.0);
+    const vec_vals = data.benchmarks.filter(b => b.name.includes("Vector")).map(b => b.real_time / 1000000.0);
+
+    const canvas = document.createElement("canvas");
+    chartContainer.appendChild(canvas);
+
+    chartInstance = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "RB-Tree Representation",
+                data: tree_vals,
+                fill: false,
+                borderColor: 'green',
+            }, {
+                label: "Vector Representation",
+                data: vec_vals,
+                fill: false,
+                borderColor: 'blue',
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: "Sketch Size"
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: "Latency (ms)"
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderOmniInsertChart(data) {
+    const labels = data.benchmarks.map((b, i) => (i + 1) * Number(b.name.split("/")[3].split(":")[1]));
+    const values = data.benchmarks.map(b => b.items_per_second);
+
+    const canvas = document.createElement("canvas");
+    chartContainer.appendChild(canvas);
+    chartInstance = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "Insertion Rate",
+                data: values,
+                fill: false,
+                borderColor: 'green',
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: "Record Index"
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: "Throughput (Records/s)"
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderOmniProbeChart(data) {
+    const labels = data.benchmarks.filter(b => b.name.includes("PointQueryFlattened")).map(b => Number(b.name.split("/")[2]));
+    const tree_vals = data.benchmarks.filter(b => b.name.split("/")[1] === "PointQuery").map(b => b.items_per_second);
+    const vec_vals = data.benchmarks.filter(b => b.name.split("/")[1] === "PointQueryFlattened").map(b => b.items_per_second);
+
+    const canvas = document.createElement("canvas");
+    chartContainer.appendChild(canvas);
+    chartInstance = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "RB-Tree Representation",
+                data: tree_vals,
+                fill: false,
+                borderColor: 'green',
+            }, {
+                label: "Vector Representation",
+                data: vec_vals,
+                fill: false,
+                borderColor: 'blue',
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: "Sketch Size"
+                    }
+                },
+                y: {
+                    title: {
+                        beginAtZero: true,
+                        display: true,
+                        text: "Throughput (Probes/s)"
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderSSBCharts(data) {
+    const labels = data.benchmarks.map(b => b.name.split("/")[2][0] + "." + b.name.split("/")[2][1]);
+    const values_latencies = data.benchmarks.map(b => b.real_time / 1000000.0);
+    const values_q_errors = data.benchmarks.map(b => b.QErr)
+
+    const canvas_latencies = document.createElement("canvas");
+    const canvas_q_errors = document.createElement("canvas");
+
+    chartContainer.appendChild(canvas_latencies);
+    chartContainer.appendChild(canvas_q_errors);
+
+    chartInstance = new Chart(canvas_latencies, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "Query Estimation Latency (ms)",
+                data: values_latencies,
+                fill: false,
+                backgroundColor: "rgba(54, 162, 235, 0.2)",
+                borderColor: 'rgb(54, 162, 235)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: "Query ID"
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: "Latency (ms)"
+                    }
+                }
+            }
+        }
+    });
+    chartInstance = new Chart(canvas_q_errors, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "Query Estimation Latency (ms)",
+                data: values_q_errors,
+                fill: false,
+                backgroundColor: "rgba(75, 192, 192, 0.2)",
+                borderColor: 'rgb(75, 192, 192)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: "Query ID"
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: "Q-Error"
+                    }
+                }
+            },
+            annotation: {
+                annotations: [{
+                    type: 'line',
+                    mode: 'horizontal',
+                    scaleID: 'y-axis-0',
+                    value: 1,
+                    borderColor: 'rgb(75, 192, 192)',
+                    borderWidth: 4,
+                    label: {
+                        enabled: false,
+                        content: 'Actual Cardinality'
+                    }
+                }]
             }
         }
     });
