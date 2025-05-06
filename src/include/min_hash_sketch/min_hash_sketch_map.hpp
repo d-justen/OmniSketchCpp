@@ -11,30 +11,34 @@ public:
 	public:
 		SketchIterator(std::map<uint64_t, HashIter>::const_iterator map_it_p,
 		               std::set<uint64_t>::const_iterator set_it_p, size_t value_count_p)
-		    : map_it(map_it_p), set_it(set_it_p), values_left(value_count_p) {
+		    : map_it(map_it_p), set_it(set_it_p), offset(0), value_count(value_count_p) {
 		}
 		void Next() override {
-			values_left--;
-			set_it++;
+			++offset;
+			++set_it;
 		}
 		uint64_t Current() override {
 			return *set_it;
+		}
+		size_t CurrentIdx() override {
+			return offset;
 		}
 		std::pair<uint64_t, uint64_t> CurrentKeyVal() {
 			return {map_it->first, *map_it->second};
 		}
 		void NextKeyVal() {
-			values_left--;
-			map_it++;
+			++offset;
+			++map_it;
 		}
 		bool IsAtEnd() override {
-			return values_left == 0;
+			return offset == value_count;
 		}
 
 	private:
 		std::map<uint64_t, HashIter>::const_iterator map_it;
 		std::set<uint64_t>::const_iterator set_it;
-		size_t values_left;
+		size_t offset;
+		size_t value_count;
 	};
 
 	class SketchFactory : public MinHashSketch::SketchFactory {
@@ -55,8 +59,7 @@ public:
 	size_t MaxCount() const override;
 	std::shared_ptr<MinHashSketch> Resize(size_t size) const override;
 	std::shared_ptr<MinHashSketch> Flatten() const override;
-	std::shared_ptr<MinHashSketch>
-	Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches) const override;
+	std::shared_ptr<MinHashSketch> Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches) override;
 	void Combine(const MinHashSketch &other) override;
 	std::shared_ptr<MinHashSketch> Combine(const std::vector<std::shared_ptr<MinHashSketch>> &others) const override;
 	std::shared_ptr<MinHashSketch> Copy() const override;

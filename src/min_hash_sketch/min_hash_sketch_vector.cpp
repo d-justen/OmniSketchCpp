@@ -12,7 +12,7 @@ void MinHashSketchVector::AddRecord(uint64_t hash) {
 }
 
 size_t MinHashSketchVector::Size() const {
-	return data.size();
+	return data.size() - validity.InvalidCount();
 }
 
 size_t MinHashSketchVector::MaxCount() const {
@@ -67,8 +67,8 @@ std::shared_ptr<MinHashSketch> MinHashSketchVector::Flatten() const {
 }
 
 std::shared_ptr<MinHashSketch>
-MinHashSketchVector::Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches) const {
-	return ComputeIntersection<MinHashSketchVector, std::vector<uint64_t>>(sketches);
+MinHashSketchVector::Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches) {
+	return ComputeIntersection<MinHashSketchVector, std::vector<uint64_t>>(sketches, &validity);
 }
 
 std::shared_ptr<MinHashSketch>
@@ -84,6 +84,7 @@ MinHashSketchVector::Combine(const std::vector<std::shared_ptr<MinHashSketch>> &
 std::shared_ptr<MinHashSketch> MinHashSketchVector::Copy() const {
 	auto result = std::make_shared<MinHashSketchVector>(max_count);
 	result->Data() = data;
+	result->validity = validity;
 	return result;
 }
 
@@ -95,11 +96,11 @@ size_t MinHashSketchVector::EstimateByteSize() const {
 }
 
 std::unique_ptr<MinHashSketch::SketchIterator> MinHashSketchVector::Iterator() const {
-	return std::make_unique<SketchIterator>(data.begin(), data.size());
+	return std::make_unique<SketchIterator>(data.begin(), &validity, data.size());
 }
 
 std::unique_ptr<MinHashSketch::SketchIterator> MinHashSketchVector::Iterator(size_t max_sample_count) const {
-	return std::make_unique<SketchIterator>(data.begin(), std::min(max_sample_count, data.size()));
+	return std::make_unique<SketchIterator>(data.begin(), &validity, std::min(max_sample_count, data.size()));
 }
 
 std::vector<uint64_t> &MinHashSketchVector::Data() {
@@ -111,7 +112,8 @@ const std::vector<uint64_t> &MinHashSketchVector::Data() const {
 }
 
 void MinHashSketchVector::EraseRecord(uint64_t hash) {
-	data.erase(std::find(data.begin(), data.end(), hash));
+	validity.SetInvalid(std::lower_bound(data.begin(), data.end(), hash) - data.begin());
+	data.erase(std::lower_bound(data.begin(), data.end(), hash));
 }
 
 } // namespace omnisketch

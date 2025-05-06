@@ -53,11 +53,11 @@ std::shared_ptr<MinHashSketch> MinHashSketchMap::Resize(size_t size) const {
 
 std::shared_ptr<MinHashSketch> MinHashSketchMap::Flatten() const {
 	std::vector<uint64_t> result_vec(data.begin(), data.end());
-	return std::make_shared<MinHashSketchVector>(std::move(result_vec));
+	return std::make_shared<MinHashSketchVector>(std::move(result_vec), ValidityMask(data.size()));
 }
 
 std::shared_ptr<MinHashSketch>
-MinHashSketchMap::Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches) const {
+MinHashSketchMap::Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches) {
 	return ComputeIntersection<MinHashSketchMap, std::set<uint64_t>>(sketches);
 }
 

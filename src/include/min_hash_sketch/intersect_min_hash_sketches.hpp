@@ -1,6 +1,6 @@
 #pragma once
 
-#include "min_hash_sketch_set.hpp"
+#include "min_hash_sketch_vector.hpp"
 
 namespace omnisketch {
 /*
@@ -98,10 +98,19 @@ std::shared_ptr<MinHashSketch> ComputeIntersection(const std::vector<std::shared
     return result;
 }*/
 
+using ValiditySetter = void (*)(ValidityMask *, size_t);
+inline void set_invalid(ValidityMask *mask, size_t i) {
+	mask->SetInvalid(i);
+}
+inline void do_nothing(ValidityMask *, size_t) {
+}
+
 template <typename T, typename U>
 std::shared_ptr<MinHashSketch> ComputeIntersection(const std::vector<std::shared_ptr<MinHashSketch>> &sketches,
-                                                   size_t max_sample_size = 0) {
+                                                   ValidityMask *mask = nullptr, size_t max_sample_size = 0) {
 	assert(!sketches.empty() && "Sketch vector to intersect must not be empty.");
+
+	ValiditySetter setter = mask ? set_invalid : do_nothing;
 
 	if (max_sample_size == 0) {
 		max_sample_size = UINT64_MAX;
@@ -117,7 +126,7 @@ std::shared_ptr<MinHashSketch> ComputeIntersection(const std::vector<std::shared
 		offsets.push_back(sketch->Iterator(max_sample_size));
 	}
 
-	auto result = std::make_shared<MinHashSketchSet>(max_sample_size);
+	auto result = std::make_shared<MinHashSketchVector>(max_sample_size);
 	auto &result_data = result->Data();
 
 	while (!offsets[0]->IsAtEnd()) {
@@ -150,7 +159,8 @@ std::shared_ptr<MinHashSketch> ComputeIntersection(const std::vector<std::shared
 			break;
 		}
 		if (found_match) {
-			result_data.insert(current_hash);
+			result_data.push_back(current_hash);
+			setter(mask, offsets[0]->CurrentIdx());
 			offsets[0]->Next();
 		}
 	}
