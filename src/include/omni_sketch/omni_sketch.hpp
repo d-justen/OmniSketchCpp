@@ -25,6 +25,7 @@ public:
 	virtual void AddValueRecord(const Value &value, uint64_t record_id) = 0;
 	virtual void AddRecordHashed(uint64_t value_hash, uint64_t record_id_hash) = 0;
 	virtual void AddNullValues(size_t count) = 0;
+	virtual size_t CountNulls() const = 0;
 	virtual std::shared_ptr<OmniSketchCell> ProbeValue(const Value &value) const = 0;
 	virtual std::shared_ptr<OmniSketchCell> ProbeValueSet(const ValueSet &values) const = 0;
 	virtual void Flatten() = 0;
@@ -51,6 +52,7 @@ public:
 	virtual void AddValueRecord(const Value &value, uint64_t record_id) override;
 	virtual void AddRecordHashed(uint64_t value_hash, uint64_t record_id_hash) override;
 	void AddNullValues(size_t count) override;
+	size_t CountNulls() const override;
 	size_t RecordCount() const override;
 	std::shared_ptr<OmniSketchCell> ProbeValue(const Value &value) const override;
 	std::shared_ptr<OmniSketchCell> ProbeHash(uint64_t hash,
@@ -76,6 +78,7 @@ protected:
 
 	std::vector<std::vector<std::shared_ptr<OmniSketchCell>>> cells;
 	size_t record_count = 0;
+	size_t null_count = 0;
 };
 
 } // namespace omnisketch

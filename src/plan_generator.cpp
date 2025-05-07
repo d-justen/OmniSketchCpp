@@ -59,12 +59,17 @@ double PlanGenerator::EstimateCardinality() const {
 
 		if (plan_item->predicates.empty() && plan_item->probed_from.empty()) {
 			assert(exec_items.size() == 1 || !exec_item->probes_into.empty());
+			// No predicates! If foreign key column has no nulls, we can ignore this join
 			if (exec_item->probes_into.size() == 1) {
 				// Directly merge into fact table
 				const auto &probes_into_table_name = exec_item->probes_into.begin()->first;
 				auto &probes_into_sketch = exec_item->probes_into.begin()->second;
 				auto &probes_into_item = exec_items[probes_into_table_name];
-				probes_into_item->combinator->AddUnfilteredRids(probes_into_sketch);
+
+				if (probes_into_sketch->CountNulls() > 0) {
+					// FK column has nulls -> Join has selectivity < 1 even without predicate on dimension table
+					probes_into_item->combinator->AddUnfilteredRids(probes_into_sketch);
+				}
 				probes_into_item->probed_from.erase(table_name);
 			} else {
 				// Add to dimension table

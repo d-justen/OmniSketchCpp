@@ -159,6 +159,11 @@ void PointOmniSketch::AddRecordHashed(uint64_t value_hash, uint64_t record_id_ha
 
 void PointOmniSketch::AddNullValues(size_t count) {
 	record_count += count;
+	null_count += count;
+}
+
+size_t PointOmniSketch::CountNulls() const {
+	return null_count;
 }
 
 } // namespace omnisketch
