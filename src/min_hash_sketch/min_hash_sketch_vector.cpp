@@ -12,7 +12,10 @@ void MinHashSketchVector::AddRecord(uint64_t hash) {
 }
 
 size_t MinHashSketchVector::Size() const {
-	return data.size() - validity.InvalidCount();
+	if (validity) {
+		return data.size() - validity->InvalidCount();
+	}
+	return data.size();
 }
 
 size_t MinHashSketchVector::MaxCount() const {
@@ -67,8 +70,9 @@ std::shared_ptr<MinHashSketch> MinHashSketchVector::Flatten() const {
 }
 
 std::shared_ptr<MinHashSketch>
-MinHashSketchVector::Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches) {
-	auto result = ComputeIntersection<MinHashSketchVector, std::vector<uint64_t>>(sketches, &validity);
+MinHashSketchVector::Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches, size_t max_sample_count) {
+	auto result =
+	    ComputeIntersection<MinHashSketchVector, std::vector<uint64_t>>(sketches, validity.get(), max_sample_count);
 	ShrinkToFit();
 	return result;
 }
@@ -86,7 +90,9 @@ MinHashSketchVector::Combine(const std::vector<std::shared_ptr<MinHashSketch>> &
 std::shared_ptr<MinHashSketch> MinHashSketchVector::Copy() const {
 	auto result = std::make_shared<MinHashSketchVector>(max_count);
 	result->Data() = data;
-	result->validity = validity;
+	if (validity) {
+		result->validity = std::make_unique<ValidityMask>(*validity);
+	}
 	return result;
 }
 
@@ -98,11 +104,11 @@ size_t MinHashSketchVector::EstimateByteSize() const {
 }
 
 std::unique_ptr<MinHashSketch::SketchIterator> MinHashSketchVector::Iterator() const {
-	return std::make_unique<SketchIterator>(data.begin(), &validity, data.size());
+	return std::make_unique<SketchIterator>(data.begin(), validity.get(), data.size());
 }
 
 std::unique_ptr<MinHashSketch::SketchIterator> MinHashSketchVector::Iterator(size_t max_sample_count) const {
-	return std::make_unique<SketchIterator>(data.begin(), &validity, std::min(max_sample_count, data.size()));
+	return std::make_unique<SketchIterator>(data.begin(), validity.get(), std::min(max_sample_count, data.size()));
 }
 
 std::vector<uint64_t> &MinHashSketchVector::Data() {
@@ -114,10 +120,14 @@ const std::vector<uint64_t> &MinHashSketchVector::Data() const {
 }
 
 void MinHashSketchVector::EraseRecord(uint64_t hash) {
-	validity.SetInvalid(std::lower_bound(data.begin(), data.end(), hash) - data.begin());
+	assert(validity);
+	validity->SetInvalid(std::lower_bound(data.begin(), data.end(), hash) - data.begin());
 }
 void MinHashSketchVector::ShrinkToFit() {
-	const size_t valid_count = data.size() - validity.InvalidCount();
+	if (!validity) {
+		return;
+	}
+	const size_t valid_count = data.size() - validity->InvalidCount();
 	if ((double)valid_count / (double)data.size() > SHRINK_TO_FIT_THRESHOLD && valid_count > 0) {
 		return;
 	}
@@ -129,7 +139,7 @@ void MinHashSketchVector::ShrinkToFit() {
 	}
 
 	data = std::move(new_data);
-	validity = ValidityMask(data.size());
+	validity = std::make_unique<ValidityMask>(data.size());
 }
 
 } // namespace omnisketch

@@ -50,6 +50,8 @@ double PlanGenerator::EstimateCardinality() const {
 		exec_items[table_name] = exec_item;
 	}
 
+	size_t base_card;
+
 	// Add constant predicates
 	std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> filtered_exec_items;
 	for (auto &exec_item_pair : exec_items) {
@@ -69,6 +71,8 @@ double PlanGenerator::EstimateCardinality() const {
 				if (probes_into_sketch->CountNulls() > 0) {
 					// FK column has nulls -> Join has selectivity < 1 even without predicate on dimension table
 					probes_into_item->combinator->AddUnfilteredRids(probes_into_sketch);
+				} else {
+					base_card = probes_into_sketch->RecordCount();
 				}
 				probes_into_item->probed_from.erase(table_name);
 			} else {
@@ -106,6 +110,10 @@ double PlanGenerator::EstimateCardinality() const {
 		if (!all_predicates_referenced || plan_item->predicates.empty()) {
 			filtered_exec_items[table_name] = exec_item;
 		}
+	}
+
+	if (filtered_exec_items.size() == 1 && !filtered_exec_items.begin()->second->combinator->HasPredicates()) {
+		return (double)base_card;
 	}
 
 	// Execute!

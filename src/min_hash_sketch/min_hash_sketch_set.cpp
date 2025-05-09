@@ -61,9 +61,9 @@ std::shared_ptr<MinHashSketch> MinHashSketchSet::Flatten() const {
 	return flattened;
 }
 
-std::shared_ptr<MinHashSketch>
-MinHashSketchSet::Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches) {
-	return ComputeIntersection<MinHashSketchSet, std::set<uint64_t>>(sketches);
+std::shared_ptr<MinHashSketch> MinHashSketchSet::Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches,
+                                                           size_t max_sample_count) {
+	return ComputeIntersection<MinHashSketchSet, std::set<uint64_t>>(sketches, nullptr, max_sample_count);
 }
 
 std::shared_ptr<MinHashSketch>

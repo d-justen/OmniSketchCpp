@@ -59,7 +59,8 @@ public:
 	size_t MaxCount() const override;
 	std::shared_ptr<MinHashSketch> Resize(size_t size) const override;
 	std::shared_ptr<MinHashSketch> Flatten() const override;
-	std::shared_ptr<MinHashSketch> Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches) override;
+	std::shared_ptr<MinHashSketch> Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches,
+	                                         size_t max_sample_count = 0) override;
 	void Combine(const MinHashSketch &other) override;
 	std::shared_ptr<MinHashSketch> Combine(const std::vector<std::shared_ptr<MinHashSketch>> &others) const override;
 	std::shared_ptr<MinHashSketch> Copy() const override;

@@ -9,6 +9,11 @@ public:
 	explicit ValidityMask(size_t size) : mask_((size + 7) / 8, 0xFF) {
 	}
 
+	ValidityMask(const ValidityMask &other) {
+		mask_ = other.mask_;
+		invalid_counter = other.invalid_counter;
+	}
+
 	void SetValid(size_t index) {
 		size_t byte_idx = index / 8;
 		size_t bit_idx = index % 8;
@@ -54,7 +59,7 @@ public:
 		void Next() override {
 			++offset;
 			++it;
-			while (!validity->IsValid(offset) && offset < value_count) {
+			while (validity && !validity->IsValid(offset) && offset < value_count) {
 				++offset;
 				++it;
 			}
@@ -78,13 +83,16 @@ public:
 	};
 
 public:
-	explicit MinHashSketchVector(std::vector<uint64_t> data_p, ValidityMask validity_p)
+	MinHashSketchVector(std::vector<uint64_t> data_p, std::unique_ptr<ValidityMask> validity_p)
 	    : data(std::move(data_p)), validity(std::move(validity_p)), max_count(data.size()) {
 	}
-	explicit MinHashSketchVector(std::vector<uint64_t> data_p)
-	    : data(std::move(data_p)), validity(data.size()), max_count(data.size()) {
+	MinHashSketchVector(size_t max_count_p, std::unique_ptr<ValidityMask> validity_p)
+	    : validity(std::move(validity_p)), max_count(max_count_p) {
+		data.reserve(max_count);
 	}
-	explicit MinHashSketchVector(size_t max_count_p) : validity(max_count_p), max_count(max_count_p) {
+	explicit MinHashSketchVector(std::vector<uint64_t> data_p) : data(std::move(data_p)), max_count(data.size()) {
+	}
+	explicit MinHashSketchVector(size_t max_count_p) : max_count(max_count_p) {
 		data.reserve(max_count);
 	}
 
@@ -94,7 +102,8 @@ public:
 	size_t MaxCount() const override;
 	std::shared_ptr<MinHashSketch> Resize(size_t size) const override;
 	std::shared_ptr<MinHashSketch> Flatten() const override;
-	std::shared_ptr<MinHashSketch> Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches) override;
+	std::shared_ptr<MinHashSketch> Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches,
+	                                         size_t max_sample_count = 0) override;
 	void Combine(const MinHashSketch &other) override;
 	std::shared_ptr<MinHashSketch> Combine(const std::vector<std::shared_ptr<MinHashSketch>> &others) const override;
 	std::shared_ptr<MinHashSketch> Copy() const override;
@@ -108,7 +117,7 @@ private:
 	void ShrinkToFit();
 
 	std::vector<uint64_t> data;
-	ValidityMask validity;
+	std::unique_ptr<ValidityMask> validity;
 	size_t max_count;
 	static constexpr double SHRINK_TO_FIT_THRESHOLD = 1.0 / 8.0;
 };

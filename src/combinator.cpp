@@ -48,7 +48,7 @@ void ExhaustiveCombinator::FindMatchesInNextJoin(const std::shared_ptr<MinHashSk
                                                  size_t current_n_max, std::vector<double> &match_counts,
                                                  std::shared_ptr<OmniSketchCell> &result) const {
 	for (auto &item : join_key_matches[join_idx]) {
-		auto intersection = current->Intersect({current, item.cell->GetMinHashSketch()});
+		auto intersection = current->Intersect({current, item.cell->GetMinHashSketch()}, max_sample_count);
 		if (intersection->Size() == 0) {
 			continue;
 		}

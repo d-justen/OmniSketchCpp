@@ -118,10 +118,22 @@ public:
 		return nullptr;
 	}
 
+	size_t EstimateByteSize() const {
+		size_t result = 0;
+		for (auto &table : sketches) {
+			for (auto &column : table.second) {
+				result += column.second.main_sketch->EstimateByteSize();
+				for (auto &ref_sketch : column.second.referencing_sketches) {
+					result += ref_sketch.second->EstimateByteSize();
+				}
+			}
+		}
+		return result;
+	}
+
 private:
 	Registry();
 	std::unordered_map<std::string, TableEntry> sketches;
-	std::vector<std::shared_ptr<PointOmniSketch>> sketch_vec;
 };
 
 } // namespace omnisketch

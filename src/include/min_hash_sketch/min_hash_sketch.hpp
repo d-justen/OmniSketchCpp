@@ -33,7 +33,8 @@ public:
 	virtual size_t MaxCount() const = 0;
 	virtual std::shared_ptr<MinHashSketch> Resize(size_t size) const = 0;
 	virtual std::shared_ptr<MinHashSketch> Flatten() const = 0;
-	virtual std::shared_ptr<MinHashSketch> Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches) = 0;
+	virtual std::shared_ptr<MinHashSketch> Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches,
+	                                                 size_t max_sample_count = 0) = 0;
 	virtual void Combine(const MinHashSketch &other) = 0;
 	virtual std::shared_ptr<MinHashSketch> Combine(const std::vector<std::shared_ptr<MinHashSketch>> &others) const = 0;
 	virtual std::shared_ptr<MinHashSketch> Copy() const = 0;

@@ -5,8 +5,21 @@ body {
     margin: auto;
 }
 
+#sticky-header {
+    position: sticky;
+    top: 0;
+    background-color: white;
+    z-index: 100;
+    width: 100%;
+    padding: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
 #controls {
-    margin-bottom: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
 }
 
 #controls select {
@@ -16,6 +29,7 @@ body {
 
 #chart-container {
     width: 100%;
+    padding: 20px;
     /*max-width: 800px;*/
 }
 

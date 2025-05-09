@@ -126,7 +126,8 @@ std::shared_ptr<MinHashSketch> ComputeIntersection(const std::vector<std::shared
 		offsets.push_back(sketch->Iterator(max_sample_size));
 	}
 
-	auto result = std::make_shared<MinHashSketchVector>(max_sample_size);
+	auto result =
+	    std::make_shared<MinHashSketchVector>(max_sample_size, std::make_unique<ValidityMask>(max_sample_size));
 	auto &result_data = result->Data();
 
 	while (!offsets[0]->IsAtEnd()) {

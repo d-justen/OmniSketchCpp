@@ -99,15 +99,17 @@ async function plotCombinedBenchmark(benchmark) {
 
     const labels = [];
     const total_times = [];
+    let has_q_errs = false;
 
     for (const file of files) {
         const res = await fetch(`benchmark_results/${benchmark}/${file}`);
         const data = await res.json();
         const total_time = data.benchmarks.map(b => b.real_time / 1000000).reduce((sum, n) => sum + n);
+        has_q_errs = data.benchmarks[0].hasOwnProperty("QErr");
 
         const l_year = file.substring(2, 4);
-        const l_month = file.substring(5, 6);
-        const l_day = file.substring(7, 8);
+        const l_month = file.substring(4, 6);
+        const l_day = file.substring(6, 8);
         const commit_hash = file.split(".")[0].split("_")[2];
 
         labels.push(`${l_day}.${l_month}.${l_year} [${commit_hash}]`);
@@ -151,6 +153,56 @@ async function plotCombinedBenchmark(benchmark) {
             }
         }
     });
+
+    if (has_q_errs) {
+        let data_sets = [];
+        let labels = [];
+        for (const file of files) {
+            const res = await fetch(`benchmark_results/${benchmark}/${file}`);
+            const data = await res.json();
+            const l_year = file.substring(2, 4);
+            const l_month = file.substring(4, 6);
+            const l_day = file.substring(6, 8);
+            const l_hour = file.substring(9, 11);
+            const l_minute = file.substring(11, 13);
+            const commit_hash = file.split(".")[0].split("_")[2];
+
+            const label = `${l_day}.${l_month}.${l_year} ${l_hour}:${l_minute} [${commit_hash}]`;
+            const q_errs = data.benchmarks.map(b => ({x: label, y: b.QErr}));
+
+            labels.push(label);
+            data_sets.push({label: label, data: q_errs});
+        }
+        const canvas_2 = document.createElement("canvas");
+        chartContainer.appendChild(canvas_2);
+
+        chartInstance = new Chart(canvas_2, {
+            type: 'scatter',
+            data: {
+                labels: labels,
+                datasets: data_sets,
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: "Experiment ID"
+                        },
+                        type: "category"
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: "Q-Errors"
+                        }
+                    }
+                }
+            }
+        });
+    }
 }
 
 // Draw chart
@@ -170,7 +222,7 @@ function renderChart(benchmark, data) {
         renderOmniProbeChart(data);
         return;
     }
-    if (benchmark === "ssb") {
+    if (benchmark.includes("ssb")) {
         renderSSBCharts(data);
     }
 }
@@ -303,9 +355,16 @@ function renderOmniProbeChart(data) {
 }
 
 function renderSSBCharts(data) {
-    const labels = data.benchmarks.map(b => b.name.split("/")[2][0] + "." + b.name.split("/")[2][1]);
+    let labels = [];
+    if (data.benchmarks[0].name.split("/").length === 4) {
+        labels = data.benchmarks.map(b => b.name.split("/")[2][0] + "." + b.name.split("/")[2][1]);
+    } else {
+        labels = data.benchmarks.map(b => b.name.split("/")[2] + "/" + b.name.split("/")[3]);
+    }
+
     const values_latencies = data.benchmarks.map(b => b.real_time / 1000000.0);
-    const values_q_errors = data.benchmarks.map(b => b.QErr)
+    const values_q_errors = data.benchmarks.map(b => b.QErr);
+    const abs_err_strs = data.benchmarks.map(b => `Card: ${b.Card}, Est: ${b.Est}`);
 
     const canvas_latencies = document.createElement("canvas");
     const canvas_q_errors = document.createElement("canvas");
@@ -345,17 +404,18 @@ function renderSSBCharts(data) {
             }
         }
     });
-    chartInstance = new Chart(canvas_q_errors, {
+    chartInstance = new Chart(canvas_q_errors.getContext('2d'), {
         type: 'bar',
         data: {
             labels: labels,
             datasets: [{
-                label: "Query Estimation Latency (ms)",
+                label: "Q-Error",
                 data: values_q_errors,
                 fill: false,
                 backgroundColor: "rgba(75, 192, 192, 0.2)",
                 borderColor: 'rgb(75, 192, 192)',
-                borderWidth: 1
+                borderWidth: 1,
+                base: 1
             }]
         },
         options: {
@@ -388,6 +448,16 @@ function renderSSBCharts(data) {
                         content: 'Actual Cardinality'
                     }
                 }]
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        afterLabel: function(context) {
+                            const index = context.dataIndex;
+                            return abs_err_strs[index];
+                        }
+                    }
+                }
             }
         }
     });
@@ -405,7 +475,12 @@ iterationSelect.addEventListener('change', () => {
     const benchmark = benchmarkSelect.value;
     const iterationFile = iterationSelect.value;
     if (benchmark && iterationFile) {
+        const scrollY = window.scrollY;
+        console.log(scrollY)
         plotBenchmark(benchmark, iterationFile);
+        setTimeout(() => {
+            window.scrollTo({ top: scrollY });
+        }, 50);
     }
 });
 

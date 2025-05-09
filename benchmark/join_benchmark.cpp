@@ -8,7 +8,7 @@
 
 using namespace omnisketch;
 enum class BenchmarkName : int64_t { SSB = 0, SSB_SKEW = 1, JOB_LIGHT = 2 };
-enum class CombinatorType : int64_t { UNCORRELATED = 0, EXHAUSTIVE = 1 };
+enum class CombinatorType : int64_t { UNCORRELATED = 0, EXHAUSTIVE = 1, EXHAUSTIVE_CORRELATED = 2 };
 
 std::vector<int64_t> AllSSBQueries() {
 	return {11, 12, 13, 21, 22, 23, 31, 32, 33, 34, 41, 42, 43};
@@ -49,7 +49,7 @@ int64_t SSBQueryIdx(int64_t in) {
 
 std::vector<int64_t> AllSSBSubQueries(size_t join_count) {
 	size_t offset = 0;
-	size_t query_count = 97;
+	size_t query_count = 0;
 	if (join_count == 0) {
 		query_count = 23;
 	} else if (join_count == 1) {
@@ -57,10 +57,13 @@ std::vector<int64_t> AllSSBSubQueries(size_t join_count) {
 		query_count = 21;
 	} else if (join_count == 2) {
 		offset = 44;
-		query_count = 35;
+		query_count = 34;
 	} else if (join_count == 3) {
-		offset = 79;
+		offset = 78;
 		query_count = 18;
+	} else if (join_count == 4) {
+		offset = 96;
+		query_count = 3;
 	} else {
 		throw std::logic_error("Too many joins.");
 	}
@@ -85,40 +88,42 @@ public:
 		return instance;
 	}
 
-	std::vector<CountQuery> LoadSSBQueries(const std::shared_ptr<OmniSketchCombinator> &c) {
+	std::vector<CountQuery> LoadSSBQueries(const std::shared_ptr<OmniSketchCombinator> &c, bool use_ref_sketches) {
 		if (!ssb_loaded) {
 			CSVImporter::ImportTables("../data/ssb/definition.csv");
 			ssb_loaded = true;
 		}
-		return CSVImporter::ImportQueries("../data/ssb/queries.csv", c);
+		return CSVImporter::ImportQueries("../data/ssb/queries.csv", c, use_ref_sketches);
 	}
 
-	std::vector<CountQuery> LoadSSBSkewQueries(const std::shared_ptr<OmniSketchCombinator> &c) {
+	std::vector<CountQuery> LoadSSBSkewQueries(const std::shared_ptr<OmniSketchCombinator> &c, bool use_ref_sketches) {
 		if (!ssb_skew_loaded) {
 			CSVImporter::ImportTables("../data/ssb-skew-sf1/definition.csv");
 			ssb_skew_loaded = true;
 		}
 		std::vector<CountQuery> queries;
-		auto ssb_queries = CSVImporter::ImportQueries("../data/ssb-skew-sf1/queries.csv", c);
+		auto ssb_queries = CSVImporter::ImportQueries("../data/ssb-skew-sf1/queries.csv", c, use_ref_sketches);
 		queries.insert(queries.end(), ssb_queries.begin(), ssb_queries.end());
-		ssb_queries = CSVImporter::ImportQueries("../data/ssb-skew-sf1/sub_queries_1.csv", c);
+		ssb_queries = CSVImporter::ImportQueries("../data/ssb-skew-sf1/sub_queries_1.csv", c, use_ref_sketches);
 		queries.insert(queries.end(), ssb_queries.begin(), ssb_queries.end());
-		ssb_queries = CSVImporter::ImportQueries("../data/ssb-skew-sf1/sub_queries_2.csv", c);
+		ssb_queries = CSVImporter::ImportQueries("../data/ssb-skew-sf1/sub_queries_2.csv", c, use_ref_sketches);
 		queries.insert(queries.end(), ssb_queries.begin(), ssb_queries.end());
-		ssb_queries = CSVImporter::ImportQueries("../data/ssb-skew-sf1/sub_queries_3.csv", c);
+		ssb_queries = CSVImporter::ImportQueries("../data/ssb-skew-sf1/sub_queries_3.csv", c, use_ref_sketches);
 		queries.insert(queries.end(), ssb_queries.begin(), ssb_queries.end());
-		ssb_queries = CSVImporter::ImportQueries("../data/ssb-skew-sf1/sub_queries_4.csv", c);
+		ssb_queries = CSVImporter::ImportQueries("../data/ssb-skew-sf1/sub_queries_4.csv", c, use_ref_sketches);
+		queries.insert(queries.end(), ssb_queries.begin(), ssb_queries.end());
+		ssb_queries = CSVImporter::ImportQueries("../data/ssb-skew-sf1/sub_queries_5.csv", c, use_ref_sketches);
 		queries.insert(queries.end(), ssb_queries.begin(), ssb_queries.end());
 
 		return queries;
 	}
 
-	std::vector<CountQuery> LoadJOBLightQueries(const std::shared_ptr<OmniSketchCombinator> &c) {
+	std::vector<CountQuery> LoadJOBLightQueries(const std::shared_ptr<OmniSketchCombinator> &c, bool use_ref_sketches) {
 		if (!job_light_loaded) {
 			CSVImporter::ImportTables("../data/imdb/definition.csv");
 			job_light_loaded = true;
 		}
-		return CSVImporter::ImportQueries("../data/imdb/queries.csv", c);
+		return CSVImporter::ImportQueries("../data/imdb/queries.csv", c, use_ref_sketches);
 	}
 
 private:
@@ -154,18 +159,20 @@ public:
 		if (combinator_type == CombinatorType::UNCORRELATED) {
 			c = std::make_shared<UncorrelatedCombinator>();
 		}
-		if (combinator_type == CombinatorType::EXHAUSTIVE) {
+		if (combinator_type == CombinatorType::EXHAUSTIVE || combinator_type == CombinatorType::EXHAUSTIVE_CORRELATED) {
 			c = std::make_shared<ExhaustiveCombinator>();
 		}
 
+		bool use_ref_sketches = combinator_type == CombinatorType::EXHAUSTIVE_CORRELATED;
+
 		if (benchmark_name == BenchmarkName::SSB) {
-			loaded_queries = singleton.LoadSSBQueries(c);
+			loaded_queries = singleton.LoadSSBQueries(c, use_ref_sketches);
 		}
 		if (benchmark_name == BenchmarkName::SSB_SKEW) {
-			loaded_queries = singleton.LoadSSBSkewQueries(c);
+			loaded_queries = singleton.LoadSSBSkewQueries(c, use_ref_sketches);
 		}
 		if (benchmark_name == BenchmarkName::JOB_LIGHT) {
-			loaded_queries = singleton.LoadJOBLightQueries(c);
+			loaded_queries = singleton.LoadJOBLightQueries(c, use_ref_sketches);
 		}
 	}
 
@@ -184,6 +191,7 @@ using SSB_SKEW = std::integral_constant<int64_t, static_cast<int64_t>(BenchmarkN
 using JOB_LIGHT = std::integral_constant<int64_t, static_cast<int64_t>(BenchmarkName::JOB_LIGHT)>;
 using UNCORRELATED = std::integral_constant<int64_t, static_cast<int64_t>(CombinatorType::UNCORRELATED)>;
 using EXHAUSTIVE = std::integral_constant<int64_t, static_cast<int64_t>(CombinatorType::EXHAUSTIVE)>;
+using EXHAUSTIVE_CORR = std::integral_constant<int64_t, static_cast<int64_t>(CombinatorType::EXHAUSTIVE_CORRELATED)>;
 
 BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBU, SSB, UNCORRELATED)
 (benchmark::State &state) {
@@ -193,6 +201,7 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBU, SSB, UNCORRELATED)
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
+		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
 	}
 }
 
@@ -204,6 +213,19 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBE, SSB, EXHAUSTIVE)
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
+		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
+	}
+}
+
+BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBCE, SSB, EXHAUSTIVE_CORR)
+(benchmark::State &state) {
+	auto &query = GetQuery(SSBQueryIdx(state.range()));
+	for (auto _ : state) {
+		auto result = query.plan.EstimateCardinality();
+		state.counters["Card"] = (double)query.cardinality;
+		state.counters["Est"] = result;
+		state.counters["QErr"] = result / (double)query.cardinality;
+		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
 	}
 }
 
@@ -215,6 +237,7 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewU, SSB_SKEW, UNCORRELAT
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
+		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
 	}
 }
 
@@ -226,6 +249,19 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewE, SSB_SKEW, EXHAUSTIVE
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
+		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
+	}
+}
+
+BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewCE, SSB_SKEW, EXHAUSTIVE_CORR)
+(benchmark::State &state) {
+	auto &query = GetQuery(SSBQueryIdx(state.range()));
+	for (auto _ : state) {
+		auto result = query.plan.EstimateCardinality();
+		state.counters["Card"] = (double)query.cardinality;
+		state.counters["Est"] = result;
+		state.counters["QErr"] = result / (double)query.cardinality;
+		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
 	}
 }
 
@@ -238,6 +274,7 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewSubU, SSB_SKEW, UNCORRE
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
+		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
 	}
 }
 
@@ -250,6 +287,20 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewSubE, SSB_SKEW, EXHAUST
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
+		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
+	}
+}
+
+BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewSubCE, SSB_SKEW, EXHAUSTIVE_CORR)
+(benchmark::State &state) {
+	auto queries = AllSSBSubQueries(state.range());
+	auto &query = GetQuery(13 + queries[state.range(1)]);
+	for (auto _ : state) {
+		auto result = query.plan.EstimateCardinality();
+		state.counters["Card"] = (double)query.cardinality;
+		state.counters["Est"] = result;
+		state.counters["QErr"] = result / (double)query.cardinality;
+		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
 	}
 }
 
@@ -261,6 +312,7 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, JOBLightU, JOB_LIGHT, UNCORREL
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
+		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
 	}
 }
 
@@ -272,11 +324,12 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, JOBLightE, JOB_LIGHT, EXHAUSTI
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
+		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
 	}
 }
 
 static void SSBSkewSubArgs(benchmark::internal::Benchmark *b) {
-	for (size_t i = 0; i < 4; i++) {
+	for (size_t i = 0; i < 5; i++) {
 		auto queries = AllSSBSubQueries(i);
 		for (size_t j = 0; j < queries.size(); j++) {
 			b->Args({static_cast<int>(i), static_cast<int>(j)});
@@ -286,10 +339,13 @@ static void SSBSkewSubArgs(benchmark::internal::Benchmark *b) {
 
 BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBU)->ArgsProduct({AllSSBQueries()})->Iterations(5);
 BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBE)->ArgsProduct({AllSSBQueries()})->Iterations(5);
+BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBCE)->ArgsProduct({AllSSBQueries()})->Iterations(5);
 BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewU)->ArgsProduct({AllSSBQueries()})->Iterations(5);
 BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewE)->ArgsProduct({AllSSBQueries()})->Iterations(5);
+BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewCE)->ArgsProduct({AllSSBQueries()})->Iterations(5);
 BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewSubU)->Apply(SSBSkewSubArgs)->Iterations(5);
 BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewSubE)->Apply(SSBSkewSubArgs)->Iterations(5);
+BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewSubCE)->Apply(SSBSkewSubArgs)->Iterations(5);
 BENCHMARK_REGISTER_F(JoinBenchmarkFixture, JOBLightU)->ArgsProduct({AllJOBLightQueries()})->Iterations(5);
 BENCHMARK_REGISTER_F(JoinBenchmarkFixture, JOBLightE)->ArgsProduct({AllJOBLightQueries()})->Iterations(5);
 
