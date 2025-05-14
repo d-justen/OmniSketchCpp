@@ -45,6 +45,12 @@ public:
 protected:
 	std::shared_ptr<PlanItem> GetOrCreatePlanItem(const std::string &table_name);
 	bool CheckIfResolvable(const std::shared_ptr<PlanExecItem> &item) const;
+	std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> CreateInitialExecutionPlan() const;
+	std::unordered_map<std::string, std::shared_ptr<PlanExecItem>>
+	RemoveUnselectiveJoins(const std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> &before) const;
+	std::unordered_map<std::string, std::shared_ptr<PlanExecItem>>
+	AddPredicatesToPlan(const std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> &before) const;
+
 	std::unordered_map<std::string, std::shared_ptr<PlanItem>> plan_items;
 	std::function<std::shared_ptr<OmniSketchCombinator>()> combinator_creator;
 	bool use_referencing_sketches = false;

@@ -34,10 +34,7 @@ bool PlanGenerator::CheckIfResolvable(const std::shared_ptr<PlanExecItem> &item)
 	return not_resolvable_count <= 1;
 }
 
-double PlanGenerator::EstimateCardinality() const {
-	auto &registry = Registry::Get();
-
-	// Build join graph
+std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> PlanGenerator::CreateInitialExecutionPlan() const {
 	std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> exec_items;
 	for (auto &plan_item_pair : plan_items) {
 		const auto &table_name = plan_item_pair.first;
@@ -49,58 +46,84 @@ double PlanGenerator::EstimateCardinality() const {
 		exec_item->probed_from = plan_item->probed_from;
 		exec_items[table_name] = exec_item;
 	}
+	return exec_items;
+}
 
-	size_t base_card;
+std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> PlanGenerator::RemoveUnselectiveJoins(
+    const std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> &before) const {
+	auto &registry = Registry::Get();
 
-	// Add constant predicates
-	std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> filtered_exec_items;
-	for (auto &exec_item_pair : exec_items) {
-		const auto &table_name = exec_item_pair.first;
-		const auto &exec_item = exec_item_pair.second;
+	std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> after;
+	for (const auto &plan_pair : before) {
+		const auto &table_name = plan_pair.first;
+		const auto &pk_side_exec_item = plan_pair.second;
 		const auto &plan_item = plan_items.find(table_name)->second;
 
 		if (plan_item->predicates.empty() && plan_item->probed_from.empty()) {
-			assert(exec_items.size() == 1 || !exec_item->probes_into.empty());
 			// No predicates! If foreign key column has no nulls, we can ignore this join
-			if (exec_item->probes_into.size() == 1) {
-				// Directly merge into fact table
-				const auto &probes_into_table_name = exec_item->probes_into.begin()->first;
-				auto &probes_into_sketch = exec_item->probes_into.begin()->second;
-				auto &probes_into_item = exec_items[probes_into_table_name];
+			if (pk_side_exec_item->probes_into.size() == 1) {
+				// For now, let's only look into tables that have exactly one join partner
+				const auto &fk_side_plan_item = *pk_side_exec_item->probes_into.begin();
+				const auto &fk_side_table_name = fk_side_plan_item.first;
+				const auto &fk_side_sketch = fk_side_plan_item.second;
+				const auto &fk_side_exec_item = before.at(fk_side_table_name);
 
-				if (probes_into_sketch->CountNulls() > 0) {
+				if (fk_side_sketch->CountNulls() > 0) {
 					// FK column has nulls -> Join has selectivity < 1 even without predicate on dimension table
-					probes_into_item->combinator->AddUnfilteredRids(probes_into_sketch);
-				} else {
-					base_card = probes_into_sketch->RecordCount();
+					// Create MinHashSketch from unfiltered foreign key OmniSketch
+					fk_side_exec_item->combinator->AddUnfilteredRids(fk_side_sketch);
 				}
-				probes_into_item->probed_from.erase(table_name);
+
+				// Remove edge and do not add primary key side to result map
+				fk_side_exec_item->probed_from.erase(table_name);
 			} else {
-				// Add to dimension table
-				exec_item->combinator->AddUnfilteredRids(registry.ProduceRidSample(table_name));
-				filtered_exec_items[table_name] = exec_item;
+				// Primary key side is not filtered out and gets unfiltered record ids as a predicate
+				pk_side_exec_item->combinator->AddUnfilteredRids(registry.ProduceRidSample(table_name));
+				after[table_name] = pk_side_exec_item;
 			}
-			continue;
+		} else {
+			after[table_name] = pk_side_exec_item;
 		}
+	}
+
+	return after;
+}
+
+std::unordered_map<std::string, std::shared_ptr<PlanExecItem>>
+PlanGenerator::AddPredicatesToPlan(const std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> &before) const {
+	auto &registry = Registry::Get();
+	std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> after;
+
+	for (const auto &plan_pair : before) {
+		const auto &table_name = plan_pair.first;
+		const auto &exec_item = plan_pair.second;
+		const auto &plan_item = plan_items.find(table_name)->second;
 
 		bool all_predicates_referenced = true;
 		for (const auto &predicate : plan_item->predicates) {
 			const auto &column_name = predicate.first;
 			const auto &probe_values = predicate.second;
+
 			if (plan_item->probed_from.empty() && plan_item->probes_into.size() == 1) {
-				const auto &probes_into_table_name = exec_item->probes_into.begin()->first;
-				auto probes_into_item = exec_items.find(probes_into_table_name)->second;
+				// TODO: What happens if graph ear probes into multiple foreign key sides?
+				// This is a graph ear!
+				const auto &fk_side_table_name = exec_item->probes_into.begin()->first;
+				auto fk_side_exec_item = before.find(fk_side_table_name)->second;
 				auto referencing_sketch =
 				    registry.FindReferencingOmniSketch(table_name, column_name, plan_item->probes_into.begin()->first);
+
 				if (referencing_sketch && use_referencing_sketches) {
 					if (referencing_sketch->Type() == OmniSketchType::FOREIGN_SORTED) {
-						auto &probes_into_sketch = exec_item->probes_into.begin()->second;
-						probes_into_item->combinator->AddPredicate(probes_into_sketch,
-						                                           referencing_sketch->ProbeHashedSet(probe_values));
+						// Coordinated sketch contains own table rids: probe foreign key sketch with results
+						auto &foreign_key_sketch = exec_item->probes_into.begin()->second;
+						fk_side_exec_item->combinator->AddPredicate(foreign_key_sketch,
+						                                            referencing_sketch->ProbeHashedSet(probe_values));
 					} else {
-						probes_into_item->combinator->AddPredicate(referencing_sketch, probe_values);
+						// Coordinated sketch has rids of its join partner: we can treat it like a predicate on the FK
+						// side
+						fk_side_exec_item->combinator->AddPredicate(referencing_sketch, probe_values);
 					}
-					probes_into_item->probed_from.erase(table_name);
+					fk_side_exec_item->probed_from.erase(table_name);
 					continue;
 				}
 			}
@@ -108,18 +131,28 @@ double PlanGenerator::EstimateCardinality() const {
 			all_predicates_referenced = false;
 		}
 		if (!all_predicates_referenced || plan_item->predicates.empty()) {
-			filtered_exec_items[table_name] = exec_item;
+			after[table_name] = exec_item;
 		}
 	}
+	return after;
+}
 
-	if (filtered_exec_items.size() == 1 && !filtered_exec_items.begin()->second->combinator->HasPredicates()) {
-		return (double)base_card;
+double PlanGenerator::EstimateCardinality() const {
+	auto &registry = Registry::Get();
+
+	auto exec_items = CreateInitialExecutionPlan();
+	exec_items = RemoveUnselectiveJoins(exec_items);
+	exec_items = AddPredicatesToPlan(exec_items);
+
+	if (exec_items.size() == 1 && !exec_items.begin()->second->combinator->HasPredicates()) {
+		// Single table without any predicates: return base table cardinality
+		return (double)registry.GetBaseTableCard(exec_items.begin()->first);
 	}
 
 	// Execute!
-	size_t items_alive = filtered_exec_items.size();
+	size_t items_alive = exec_items.size();
 	while (items_alive > 1) {
-		for (const auto &exec_item_pair : filtered_exec_items) {
+		for (const auto &exec_item_pair : exec_items) {
 			const auto &table_name = exec_item_pair.first;
 			const auto &exec_item = exec_item_pair.second;
 
@@ -135,7 +168,7 @@ double PlanGenerator::EstimateCardinality() const {
 				// This should be our last relation
 				if (items_alive != 1) {
 					throw std::logic_error("Unconnected relation: " + std::to_string(items_alive) + " of " +
-					                       std::to_string(filtered_exec_items.size()) + " left.");
+					                       std::to_string(exec_items.size()) + " left.");
 				}
 				continue;
 			}
@@ -143,7 +176,7 @@ double PlanGenerator::EstimateCardinality() const {
 			if (exec_item->probes_into.size() == 1) {
 				const auto &fk_table_name = exec_item->probes_into.begin()->first;
 				const auto &fk_sketch = exec_item->probes_into.begin()->second;
-				auto &fk_side_item = filtered_exec_items[fk_table_name];
+				auto &fk_side_item = exec_items[fk_table_name];
 
 				auto pk_probe_set = exec_item->combinator->ComputeResult(UINT64_MAX);
 				if (pk_probe_set->RecordCount() == 0) {
@@ -167,7 +200,7 @@ double PlanGenerator::EstimateCardinality() const {
 
 				size_t current_fk_idx = 0;
 				for (auto &fk_side_item_pair : exec_item->probes_into) {
-					auto &fk_side_item = filtered_exec_items[fk_side_item_pair.first];
+					auto &fk_side_item = exec_items[fk_side_item_pair.first];
 					auto &fk_omni_sketch = fk_side_item_pair.second;
 					if (!fk_side_item->probes_into.empty() || fk_side_item->probed_from.size() > 1 ||
 					    current_fk_idx == exec_item->probes_into.size() - 1) {
@@ -199,7 +232,7 @@ double PlanGenerator::EstimateCardinality() const {
 	}
 
 	std::shared_ptr<PlanExecItem> plan_item;
-	for (auto &item : filtered_exec_items) {
+	for (auto &item : exec_items) {
 		if (!item.second->done) {
 			assert(!plan_item);
 			plan_item = item.second;

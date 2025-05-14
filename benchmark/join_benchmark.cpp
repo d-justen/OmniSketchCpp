@@ -328,6 +328,18 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, JOBLightE, JOB_LIGHT, EXHAUSTI
 	}
 }
 
+BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, JOBLightCE, JOB_LIGHT, EXHAUSTIVE_CORR)
+(benchmark::State &state) {
+	auto &query = GetQuery(state.range());
+	for (auto _ : state) {
+		auto result = query.plan.EstimateCardinality();
+		state.counters["Card"] = (double)query.cardinality;
+		state.counters["Est"] = result;
+		state.counters["QErr"] = result / (double)query.cardinality;
+		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
+	}
+}
+
 static void SSBSkewSubArgs(benchmark::internal::Benchmark *b) {
 	for (size_t i = 0; i < 5; i++) {
 		auto queries = AllSSBSubQueries(i);
@@ -348,5 +360,6 @@ BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewSubE)->Apply(SSBSkewSubArgs)->
 BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewSubCE)->Apply(SSBSkewSubArgs)->Iterations(5);
 BENCHMARK_REGISTER_F(JoinBenchmarkFixture, JOBLightU)->ArgsProduct({AllJOBLightQueries()})->Iterations(5);
 BENCHMARK_REGISTER_F(JoinBenchmarkFixture, JOBLightE)->ArgsProduct({AllJOBLightQueries()})->Iterations(5);
+BENCHMARK_REGISTER_F(JoinBenchmarkFixture, JOBLightCE)->ArgsProduct({AllJOBLightQueries()})->Iterations(5);
 
 BENCHMARK_MAIN();

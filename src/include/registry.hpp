@@ -118,6 +118,13 @@ public:
 		return nullptr;
 	}
 
+	size_t GetBaseTableCard(const std::string &table_name) const {
+		const auto table_entry_it = sketches.find(table_name);
+		assert(table_entry_it != sketches.end());
+		assert(!table_entry_it->second.empty());
+		return table_entry_it->second.begin()->second.main_sketch->RecordCount();
+	}
+
 	size_t EstimateByteSize() const {
 		size_t result = 0;
 		for (auto &table : sketches) {

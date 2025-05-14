@@ -53,8 +53,9 @@ public:
 		return [sketch](const std::string &val, const size_t rid) {
 			if (val.empty()) {
 				sketch->AddNullValues(1);
+			} else {
+				sketch->AddRecord(ConvertString<T>(val), rid);
 			}
-			sketch->AddRecord(ConvertString<T>(val), rid);
 		};
 	}
 
