@@ -206,7 +206,7 @@ async function plotCombinedBenchmark(benchmark) {
 }
 
 // Draw chart
-function renderChart(benchmark, data) {
+async function renderChart(benchmark, data) {
     chartContainer.innerHTML = "";
     if (chartInstance) chartInstance.destroy();
 
@@ -223,7 +223,53 @@ function renderChart(benchmark, data) {
         return;
     }
     if (benchmark.includes("ssb")) {
-        renderSSBCharts(data);
+        const response = await fetch(`benchmark_results/${benchmark}/baselines`);
+        const text = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(text, 'text/html');
+        const files = Array.from(doc.querySelectorAll('a'))
+            .map(a => a.getAttribute('href'))
+            .filter(name => name.endsWith('.json'))
+            .sort();
+        console.log(files)
+        const baseline_data = [];
+        let count = 0;
+        const backgroundColors = [
+            'rgba(255, 99, 132, 0.2)',
+            'rgba(255, 159, 64, 0.2)',
+            'rgba(255, 205, 86, 0.2)',
+            'rgba(54, 162, 235, 0.2)',
+            'rgba(153, 102, 255, 0.2)',
+            'rgba(201, 203, 207, 0.2)'
+        ];
+        const borderColors = [
+            'rgb(255, 99, 132)',
+            'rgb(255, 159, 64)',
+            'rgb(255, 205, 86)',
+            'rgb(54, 162, 235)',
+            'rgb(153, 102, 255)',
+            'rgb(201, 203, 207)'
+        ];
+
+        for (const file_name of files) {
+            console.log(file_name)
+            const res = await fetch(`benchmark_results/${benchmark}/baselines/${file_name}`);
+            const baseline_data_points = await res.json();
+            const q_errs = [];
+            for (const key in baseline_data_points) {
+                q_errs.push(...baseline_data_points[key]);
+            }
+            const baseline = {
+                label: file_name.split(".")[0], data: q_errs, fill: false,
+                backgroundColor: backgroundColors[count % backgroundColors.length],
+                borderColor: borderColors[count % borderColors.length],
+                borderWidth: 1,
+                base: 1
+            };
+            baseline_data.push(baseline);
+            count++;
+        }
+        renderSSBCharts(data, baseline_data);
     }
 }
 
@@ -354,7 +400,7 @@ function renderOmniProbeChart(data) {
     });
 }
 
-function renderSSBCharts(data) {
+function renderSSBCharts(data, baseline_data) {
     let labels = [];
     if (data.benchmarks[0].name.split("/").length === 4) {
         labels = data.benchmarks.map(b => b.name.split("/")[2][0] + "." + b.name.split("/")[2][1]);
@@ -364,7 +410,7 @@ function renderSSBCharts(data) {
 
     const values_latencies = data.benchmarks.map(b => b.real_time / 1000000.0);
     const values_q_errors = data.benchmarks.map(b => b.QErr);
-    const abs_err_strs = data.benchmarks.map(b => `Card: ${b.Card}, Est: ${b.Est}`);
+    const abs_err_strs = data.benchmarks.map(b => `Card: ${b.Card}, OmniSketch Est: ${b.Est}`);
 
     const canvas_latencies = document.createElement("canvas");
     const canvas_q_errors = document.createElement("canvas");
@@ -409,14 +455,14 @@ function renderSSBCharts(data) {
         data: {
             labels: labels,
             datasets: [{
-                label: "Q-Error",
-                data: values_q_errors,
+                label: "OmniSketch",
+                data: values_q_errors.map(v => v === 0 ? 1 / 100.0 : v),
                 fill: false,
                 backgroundColor: "rgba(75, 192, 192, 0.2)",
                 borderColor: 'rgb(75, 192, 192)',
                 borderWidth: 1,
                 base: 1
-            }]
+            }, ...baseline_data]
         },
         options: {
             responsive: true,
@@ -428,31 +474,18 @@ function renderSSBCharts(data) {
                     }
                 },
                 y: {
-                    beginAtZero: true,
+                    type: "logarithmic",
+                    beginAtZero: false,
                     title: {
                         display: true,
                         text: "Q-Error"
                     }
                 }
             },
-            annotation: {
-                annotations: [{
-                    type: 'line',
-                    mode: 'horizontal',
-                    scaleID: 'y-axis-0',
-                    value: 1,
-                    borderColor: 'rgb(75, 192, 192)',
-                    borderWidth: 4,
-                    label: {
-                        enabled: false,
-                        content: 'Actual Cardinality'
-                    }
-                }]
-            },
             plugins: {
                 tooltip: {
                     callbacks: {
-                        afterLabel: function(context) {
+                        afterLabel: function (context) {
                             const index = context.dataIndex;
                             return abs_err_strs[index];
                         }
@@ -479,7 +512,7 @@ iterationSelect.addEventListener('change', () => {
         console.log(scrollY)
         plotBenchmark(benchmark, iterationFile);
         setTimeout(() => {
-            window.scrollTo({ top: scrollY });
+            window.scrollTo({top: scrollY});
         }, 50);
     }
 });
