@@ -94,11 +94,17 @@ std::shared_ptr<OmniSketchCell> ExhaustiveCombinator::ComputeResult(size_t max_o
 		double last_card_unscaled = predicate_idx == 0 ? (double)base_card : match_counts[predicate_idx - 1];
 		double next_card_scaled =
 		    std::min(last_card_unscaled, match_counts[predicate_idx] / sampling_probabilities[predicate_idx]);
-		double sel = next_card_scaled / last_card_unscaled;
-		result_card *= sel;
+		if (next_card_scaled == 0 || last_card_unscaled == 0) {
+			// We have run out of witnesses
+			// TODO: Order predicates to ensure consistent result
+			result_card *= join_sels[predicate_idx];
+		} else {
+			double sel = next_card_scaled / last_card_unscaled;
+			result_card *= sel;
+		}
 	}
 
-	result->SetRecordCount((size_t)result_card);
+	result->SetRecordCount((size_t)std::max(std::round(result_card), 1.0));
 	return result;
 }
 

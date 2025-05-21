@@ -29,6 +29,8 @@ target_link_libraries(join_benchmark omnisketch benchmark::benchmark)
 add_executable(individual_probe_errors_benchmark individual_probe_errors_benchmark.cpp)
 target_link_libraries(individual_probe_errors_benchmark omnisketch benchmark::benchmark)
 
+add_executable(ingestion_benchmark ingestion_benchmark.cpp)
+target_link_libraries(ingestion_benchmark omnisketch benchmark::benchmark)
 
 if ("${CMAKE_SYSTEM_NAME}" MATCHES "Windows")
     target_link_libraries(min_hash_sketch_benchmark Shlwapi)

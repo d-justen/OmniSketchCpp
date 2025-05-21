@@ -1,6 +1,6 @@
 #pragma once
 
-#include "min_hash_sketch/min_hash_sketch_vector.hpp"
+#include "min_hash_sketch/min_hash_sketch_pair.hpp"
 #include "omni_sketch.hpp"
 
 namespace omnisketch {
@@ -13,7 +13,7 @@ public:
 	                    std::shared_ptr<SetMembershipAlgorithm> set_membership_algo_p,
 	                    std::shared_ptr<CellIdxMapper> hash_processor_p)
 	    : PointOmniSketch(width_p, depth_p, max_sample_count_p, std::move(set_membership_algo_p),
-	                      std::move(hash_processor_p)),
+	                      std::move(hash_processor_p), std::make_shared<MinHashSketchPair::SketchFactory>()),
 	      referenced_sketch(std::move(sketch)), hf(std::move(hash_function_p)) {
 		probe_buffer.resize(referenced_sketch->Depth());
 	}
@@ -33,7 +33,10 @@ public:
 		hash_processor->SetHash(value_hash);
 		for (size_t row_idx = 0; row_idx < depth; row_idx++) {
 			const size_t col_idx = hash_processor->ComputeCellIdx(row_idx);
-			cells[row_idx][col_idx]->Combine(*probe_result);
+			auto &cell = cells[row_idx][col_idx];
+			auto *min_hash_sketch = dynamic_cast<MinHashSketchPair *>(cell->GetMinHashSketch().get());
+			min_hash_sketch->CombineWithSecondaryHash(*probe_result->GetMinHashSketch(), record_id_hash);
+			cell->SetRecordCount(cell->RecordCount() + probe_result->RecordCount());
 		}
 		record_count += probe_result->RecordCount();
 	}

@@ -5,59 +5,57 @@
 
 namespace omnisketch {
 
-class MinHashSketchVector : public MinHashSketch {
+class MinHashSketchPair : public MinHashSketch {
 public:
 	class SketchIterator : public MinHashSketch::SketchIterator {
 	public:
-		SketchIterator(std::vector<uint64_t>::const_iterator it_p, const ValidityMask *validity_p, size_t value_count_p)
-		    : it(it_p), validity(validity_p), offset(0), value_count(value_count_p) {
+		SketchIterator(std::map<uint64_t, uint64_t>::const_iterator map_it_p, const ValidityMask *validity_p,
+		               size_t value_count_p)
+		    : map_it(map_it_p), validity(validity_p), offset(0), value_count(value_count_p) {
+		}
+		void Next() override {
+			++offset;
+			++map_it;
+			while (validity && !validity->IsValid(offset) && offset < value_count) {
+				++offset;
+				++map_it;
+			}
 		}
 		uint64_t Current() override {
-			return *it;
+			return map_it->first;
 		}
 		size_t CurrentIdx() override {
 			return offset;
 		}
-		void Next() override {
-			++offset;
-			++it;
-			while (validity && !validity->IsValid(offset) && offset < value_count) {
-				++offset;
-				++it;
-			}
+		std::pair<uint64_t, uint64_t> CurrentKeyVal() {
+			return {map_it->first, map_it->second};
+		}
+		uint64_t CurrentVal() {
+			return map_it->second;
 		}
 		bool IsAtEnd() override {
 			return offset == value_count;
 		}
 
 	private:
-		std::vector<uint64_t>::const_iterator it;
-		const ValidityMask *validity;
+		std::map<uint64_t, uint64_t>::const_iterator map_it;
+		const ValidityMask* validity;
 		size_t offset;
-		const size_t value_count;
+		size_t value_count;
 	};
 
 	class SketchFactory : public MinHashSketch::SketchFactory {
 	public:
 		virtual std::shared_ptr<MinHashSketch> Create(size_t max_sample_count) {
-			return std::make_shared<MinHashSketchVector>(max_sample_count);
+			return std::make_shared<MinHashSketchPair>(max_sample_count, nullptr);
 		}
 	};
 
 public:
-	MinHashSketchVector(std::vector<uint64_t> data_p, std::unique_ptr<ValidityMask> validity_p)
-	    : data(std::move(data_p)), validity(std::move(validity_p)), max_count(data.size()) {
-	}
-	MinHashSketchVector(size_t max_count_p, std::unique_ptr<ValidityMask> validity_p)
-	    : validity(std::move(validity_p)), max_count(max_count_p) {
-		data.reserve(max_count);
-	}
-	explicit MinHashSketchVector(std::vector<uint64_t> data_p) : data(std::move(data_p)), max_count(data.size()) {
-	}
-	explicit MinHashSketchVector(size_t max_count_p) : max_count(max_count_p) {
-		data.reserve(max_count);
+	explicit MinHashSketchPair(size_t max_count_p, std::unique_ptr<ValidityMask> validity_p) : max_count(max_count_p), validity(std::move(validity_p)) {
 	}
 
+	void AddRecord(uint64_t primary_rid, uint64_t secondary_rid);
 	void AddRecord(uint64_t hash) override;
 	void EraseRecord(uint64_t hash) override;
 	size_t Size() const override;
@@ -67,21 +65,21 @@ public:
 	std::shared_ptr<MinHashSketch> Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches,
 	                                         size_t max_sample_count = 0) override;
 	void Combine(const MinHashSketch &other) override;
+	void CombineWithSecondaryHash(const MinHashSketch &other, uint64_t secondary_hash);
 	std::shared_ptr<MinHashSketch> Combine(const std::vector<std::shared_ptr<MinHashSketch>> &others) const override;
 	std::shared_ptr<MinHashSketch> Copy() const override;
 	size_t EstimateByteSize() const override;
 	std::unique_ptr<MinHashSketch::SketchIterator> Iterator() const override;
 	std::unique_ptr<MinHashSketch::SketchIterator> Iterator(size_t max_sample_count) const override;
-	std::vector<uint64_t> &Data();
-	const std::vector<uint64_t> &Data() const;
+	std::map<uint64_t, uint64_t> &Data();
+	const std::map<uint64_t, uint64_t> &Data() const;
+	std::set<uint64_t> PrimaryRids() const;
+	std::set<uint64_t> SecondaryRids() const;
 
 private:
-	void ShrinkToFit();
-
-	std::vector<uint64_t> data;
-	std::unique_ptr<ValidityMask> validity;
+	std::map<uint64_t, uint64_t> data;
 	size_t max_count;
-	static constexpr double SHRINK_TO_FIT_THRESHOLD = 1.0 / 8.0;
+	std::unique_ptr<ValidityMask> validity;
 };
 
 } // namespace omnisketch

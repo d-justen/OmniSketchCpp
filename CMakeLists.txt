@@ -21,8 +21,10 @@ set(SOURCE_FILES
         src/include/min_hash_sketch/intersect_min_hash_sketches.hpp
         src/include/min_hash_sketch/min_hash_sketch.hpp
         src/include/min_hash_sketch/min_hash_sketch_map.hpp
+        src/include/min_hash_sketch/min_hash_sketch_pair.hpp
         src/include/min_hash_sketch/min_hash_sketch_set.hpp
         src/include/min_hash_sketch/min_hash_sketch_vector.hpp
+        src/include/min_hash_sketch/validity_mask.hpp
 
         src/include/omni_sketch/foreign_sorted_omni_sketch.hpp
         src/include/omni_sketch/omni_sketch.hpp
@@ -39,9 +41,12 @@ set(SOURCE_FILES
         src/include/registry.hpp
         src/include/set_membership.hpp
 
+        src/min_hash_sketch/intersect_min_hash_sketches.cpp
         src/min_hash_sketch/min_hash_sketch_map.cpp
+        src/min_hash_sketch/min_hash_sketch_pair.cpp
         src/min_hash_sketch/min_hash_sketch_set.cpp
         src/min_hash_sketch/min_hash_sketch_vector.cpp
+        src/min_hash_sketch/validity_mask.cpp
 
         src/omni_sketch/omni_sketch.cpp
         src/omni_sketch/omni_sketch_cell.cpp

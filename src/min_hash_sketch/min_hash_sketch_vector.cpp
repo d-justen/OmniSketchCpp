@@ -71,8 +71,7 @@ std::shared_ptr<MinHashSketch> MinHashSketchVector::Flatten() const {
 
 std::shared_ptr<MinHashSketch>
 MinHashSketchVector::Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches, size_t max_sample_count) {
-	auto result =
-	    ComputeIntersection<MinHashSketchVector, std::vector<uint64_t>>(sketches, validity.get(), max_sample_count);
+	auto result = ComputeIntersection(sketches, validity.get(), max_sample_count);
 	ShrinkToFit();
 	return result;
 }
