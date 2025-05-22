@@ -1,6 +1,7 @@
 #include "csv_importer.hpp"
 
 #include "registry.hpp"
+#include "util/value.hpp"
 
 namespace omnisketch {
 
@@ -42,6 +43,82 @@ CreateExtendingSketchAndFunc(const std::string &table_name, const std::string &c
 	}
 }
 
+std::function<void(const std::string &, const size_t)>
+CreateExtendingSketchAndFuncDateTime(const std::string &table_name, const std::string &column_name,
+                                     const std::vector<std::string> &referencing_table_names,
+                                     const std::vector<std::string> &referencing_column_names,
+                                     const OmniSketchConfig &config) {
+	auto &registry = Registry::Get();
+
+	registry.CreateOmniSketch<size_t>(table_name, column_name, config);
+	if (!config.referencing_type) {
+		auto sketch = registry.GetOmniSketchTyped<size_t>(table_name, column_name);
+
+		return [sketch](const std::string &val, const size_t rid) {
+			if (val.empty()) {
+				sketch->AddNullValues(1);
+			} else {
+				sketch->AddRecord(DateTimeStringToUnixTimestamp(val), rid);
+			}
+		};
+	}
+	if (*config.referencing_type == OmniSketchType::PRE_JOINED) {
+		for (size_t i = 0; i < referencing_table_names.size(); i++) {
+			registry.CreateExtendingOmniSketch<PreJoinedOmniSketch<size_t>, size_t>(
+			    table_name, column_name, referencing_table_names[i], referencing_column_names[i], config);
+		}
+
+		auto sketch = registry.GetOmniSketchTyped<size_t>(table_name, column_name);
+		std::vector<std::shared_ptr<PreJoinedOmniSketch<size_t>>> ref_sketches;
+		for (const auto &ref_tbl_name : referencing_table_names) {
+			auto ref_sketch = registry.FindReferencingOmniSketchTyped<PreJoinedOmniSketch<size_t>>(
+			    table_name, column_name, ref_tbl_name);
+			assert(ref_sketch);
+			ref_sketches.push_back(ref_sketch);
+		}
+
+		return [sketch, ref_sketches](const std::string &val, const size_t rid) {
+			if (val.empty()) {
+				sketch->AddNullValues(1);
+				for (auto &rs : ref_sketches) {
+					rs->AddNullValues(1);
+				}
+			}
+			for (auto &rs : ref_sketches) {
+				rs->AddRecord(DateTimeStringToUnixTimestamp(val), rid);
+			}
+		};
+	} else {
+		assert(*config.referencing_type == OmniSketchType::FOREIGN_SORTED);
+		for (size_t i = 0; i < referencing_table_names.size(); i++) {
+			registry.CreateExtendingOmniSketch<ForeignSortedOmniSketch<size_t>, size_t>(
+			    table_name, column_name, referencing_table_names[i], referencing_column_names[i], config);
+		}
+		auto sketch = registry.GetOmniSketchTyped<size_t>(table_name, column_name);
+		std::vector<std::shared_ptr<ForeignSortedOmniSketch<size_t>>> ref_sketches;
+		for (const auto &ref_tbl_name : referencing_table_names) {
+			auto ref_sketch = registry.FindReferencingOmniSketchTyped<ForeignSortedOmniSketch<size_t>>(
+			    table_name, column_name, ref_tbl_name);
+			assert(ref_sketch);
+			ref_sketches.push_back(ref_sketch);
+		}
+
+		return [sketch, ref_sketches](const std::string &val, const size_t rid) {
+			if (val.empty()) {
+				sketch->AddNullValues(1);
+				for (auto &rs : ref_sketches) {
+					rs->AddNullValues(1);
+				}
+			}
+			const size_t timestamp = DateTimeStringToUnixTimestamp(val);
+			sketch->AddRecord(timestamp, rid);
+			for (auto &rs : ref_sketches) {
+				rs->AddRecord(timestamp, rid);
+			}
+		};
+	}
+}
+
 void CSVImporter::ImportTable(const std::string &path, const std::string &table_name,
                               const std::vector<std::string> &column_names,
                               const std::vector<std::string> &referencing_table_names,
@@ -78,6 +155,10 @@ void CSVImporter::ImportTable(const std::string &path, const std::string &table_
 			    table_name, column_names[i], referencing_table_names, referencing_column_names, configs[i]));
 			break;
 		}
+		case ColumnType::DATETIME:
+			insert_funcs.emplace_back(CreateExtendingSketchAndFuncDateTime(
+			    table_name, column_names[i], referencing_table_names, referencing_column_names, configs[i]));
+			break;
 		}
 	}
 
@@ -143,6 +224,8 @@ void CSVImporter::ImportTables(const std::string &path_to_definition_file) {
 				data_types.push_back(ColumnType::DOUBLE);
 			} else if (val == "varchar") {
 				data_types.push_back(ColumnType::VARCHAR);
+			} else if (val == "datetime") {
+				data_types.push_back(ColumnType::DATETIME);
 			} else {
 				throw std::logic_error("Unkown data type.");
 			}

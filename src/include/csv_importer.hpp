@@ -11,7 +11,7 @@
 
 namespace omnisketch {
 
-enum class ColumnType { INT, UINT, DOUBLE, VARCHAR };
+enum class ColumnType { INT, UINT, DOUBLE, VARCHAR, DATETIME };
 
 struct CountQuery {
 	PlanGenerator plan;

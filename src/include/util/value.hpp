@@ -2,7 +2,18 @@
 
 #include "hash.hpp"
 
+#include <ctime>
+#include <iomanip>
+#include <sstream>
+
 namespace omnisketch {
+
+size_t DateTimeStringToUnixTimestamp(const std::string &date_time) {
+	std::tm tm = {};
+	std::istringstream ss(date_time);
+	ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+	return std::mktime(&tm);
+}
 
 class Value {
 public:
@@ -12,6 +23,9 @@ public:
 	}
 	inline uint64_t GetHash() const {
 		return hash;
+	}
+	static Value FromDateTime(const std::string &date_time) {
+		return Value(hash_functions::Hash<size_t>(DateTimeStringToUnixTimestamp(date_time)));
 	}
 
 private:
