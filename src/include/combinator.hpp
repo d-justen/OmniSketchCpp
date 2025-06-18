@@ -42,10 +42,17 @@ public:
 	                          std::shared_ptr<OmniSketchCell> probe_sample) = 0;
 	virtual void AddUnfilteredRids(std::shared_ptr<OmniSketch> omni_sketch) = 0;
 	virtual void AddUnfilteredRids(std::shared_ptr<OmniSketchCell> rid_sample) = 0;
+	virtual void AddFKMultiplier(double multiplier_p) = 0;
 	virtual bool HasPredicates() const = 0;
 	virtual std::shared_ptr<OmniSketchCell> ComputeResult(size_t max_output_size) const = 0;
 	virtual std::shared_ptr<OmniSketchCell> FilterProbeSet(std::shared_ptr<OmniSketch> omni_sketch,
 	                                                       std::shared_ptr<OmniSketchCell> probe_sample) const = 0;
+
+	void SetBaseCard(size_t card) {
+		base_card = card;
+	}
+protected:
+	size_t base_card;
 };
 
 struct ExhaustiveCombinatorItem {
@@ -70,6 +77,7 @@ public:
 	void AddPredicate(std::shared_ptr<OmniSketch> omni_sketch, std::shared_ptr<OmniSketchCell> probe_sample) override;
 	void AddUnfilteredRids(std::shared_ptr<OmniSketch> omni_sketch) override;
 	void AddUnfilteredRids(std::shared_ptr<OmniSketchCell> rid_sample) override;
+	void AddFKMultiplier(double multiplier_p) override;
 	bool HasPredicates() const override;
 	std::shared_ptr<OmniSketchCell> ComputeResult(size_t max_output_size) const override;
 	std::shared_ptr<OmniSketchCell> FilterProbeSet(std::shared_ptr<OmniSketch> omni_sketch,
@@ -80,7 +88,9 @@ protected:
 	std::vector<double> sampling_probabilities;
 	std::vector<double> join_sels;
 	size_t max_sample_count;
-	size_t base_card;
+	std::vector<std::shared_ptr<OmniSketch>> sketch_filters;
+	double multiplier = 1;
+	std::map<>
 
 protected:
 	void FindMatchesInNextJoin(const std::shared_ptr<MinHashSketch> &current, size_t join_idx, size_t current_n_max,
@@ -92,6 +102,7 @@ public:
 	void AddPredicate(std::shared_ptr<OmniSketch> omni_sketch, std::shared_ptr<OmniSketchCell> probe_sample) override;
 	void AddUnfilteredRids(std::shared_ptr<OmniSketch> omni_sketch) override;
 	void AddUnfilteredRids(std::shared_ptr<OmniSketchCell> rid_sample) override;
+	void AddFKMultiplier(double /*multiplier_p*/) override {}
 	bool HasPredicates() const override;
 	std::shared_ptr<OmniSketchCell> ComputeResult(size_t max_output_size) const override;
 	std::shared_ptr<OmniSketchCell> FilterProbeSet(std::shared_ptr<OmniSketch> omni_sketch,
@@ -101,7 +112,6 @@ protected:
 	std::vector<std::pair<std::shared_ptr<OmniSketch>, std::shared_ptr<OmniSketchCell>>> joins;
 	std::vector<std::shared_ptr<MinHashSketch>> join_results;
 	double query_selectivity = 1;
-	size_t base_card;
 };
 
 } // namespace omnisketch

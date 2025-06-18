@@ -74,12 +74,17 @@ void ExhaustiveCombinator::FindMatchesInNextJoin(const std::shared_ptr<MinHashSk
 
 std::shared_ptr<OmniSketchCell> ExhaustiveCombinator::ComputeResult(size_t max_output_size) const {
 	auto result = std::make_shared<OmniSketchCell>(max_output_size);
+	if (join_key_matches.empty()) {
+		assert(!sketch_filters.empty());
+		result = sketch_filters.front()->GetRids();
+		return result;
+	}
 
 	if (join_key_matches.size() == 1) {
 		for (auto &match : join_key_matches.front()) {
 			result->Combine(*match.cell);
 		}
-		result->SetRecordCount((size_t)std::round((double)result->RecordCount() / sampling_probabilities[0]));
+		result->SetRecordCount((size_t)std::round(((double)result->RecordCount() / sampling_probabilities[0]) * multiplier));
 		return result;
 	}
 
@@ -92,13 +97,12 @@ std::shared_ptr<OmniSketchCell> ExhaustiveCombinator::ComputeResult(size_t max_o
 	auto result_card = (double)base_card;
 	for (size_t predicate_idx = 0; predicate_idx < match_counts.size(); predicate_idx++) {
 		double last_card_unscaled = predicate_idx == 0 ? (double)base_card : match_counts[predicate_idx - 1];
-		double next_card_scaled =
-		    std::min(last_card_unscaled, match_counts[predicate_idx] / sampling_probabilities[predicate_idx]);
+		double next_card_scaled = match_counts[predicate_idx] / sampling_probabilities[predicate_idx];
 		double sel = next_card_scaled / last_card_unscaled;
 		result_card *= sel;
 	}
 
-	result->SetRecordCount((size_t)result_card);
+	result->SetRecordCount((size_t)result_card * multiplier);
 	return result;
 }
 
@@ -147,14 +151,25 @@ ExhaustiveCombinator::FilterProbeSet(std::shared_ptr<OmniSketch> omni_sketch,
 
 	const double card_est = std::min((double)omni_sketch->RecordCount(),
 	                                 (double)filtered_probe_set->RecordCount() / probe_sample->SamplingProbability());
-	filtered_probe_set->SetRecordCount((size_t)std::round(card_est));
+	filtered_probe_set->SetRecordCount((size_t)std::round(card_est * multiplier));
 
 	return filtered_probe_set;
 }
 
 void ExhaustiveCombinator::AddUnfilteredRids(std::shared_ptr<OmniSketch> omni_sketch) {
-	auto all_rids = omni_sketch->GetRids();
-	AddUnfilteredRids(all_rids);
+	base_card = std::max(base_card, omni_sketch->RecordCount());
+	max_sample_count = omni_sketch->MinHashSketchSize();
+	sampling_probabilities.push_back(1);
+
+	std::vector<ExhaustiveCombinatorItem> items;
+	items.reserve(omni_sketch->Width());
+	for (size_t i = 0; i < omni_sketch->Width(); i++) {
+		auto cell = omni_sketch->GetCellPtr(0, i);
+		if (cell->RecordCount() > 0) {
+			items.emplace_back(std::move(cell), cell->RecordCount());
+		}
+	}
+	join_key_matches.push_back(items);
 }
 
 bool ExhaustiveCombinator::HasPredicates() const {
@@ -162,12 +177,16 @@ bool ExhaustiveCombinator::HasPredicates() const {
 }
 
 void ExhaustiveCombinator::AddUnfilteredRids(std::shared_ptr<OmniSketchCell> rid_sample) {
-	base_card = rid_sample->RecordCount();
+	base_card = std::max(base_card, rid_sample->RecordCount());
 	max_sample_count = rid_sample->MaxSampleCount();
 	sampling_probabilities.push_back(1);
 
 	join_key_matches.emplace_back();
 	join_key_matches.back().emplace_back(rid_sample, rid_sample->RecordCount());
+}
+
+void ExhaustiveCombinator::AddFKMultiplier(double multiplier_p) {
+	multiplier *= multiplier_p;
 }
 
 void UncorrelatedCombinator::AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,

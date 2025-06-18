@@ -166,4 +166,11 @@ size_t PointOmniSketch::CountNulls() const {
 	return null_count;
 }
 
+size_t PointOmniSketch::ValueCount() const {
+	return record_count - null_count;
+}
+std::shared_ptr<OmniSketchCell> PointOmniSketch::GetCellPtr(size_t row_idx, size_t col_idx) const {
+	return cells[row_idx][col_idx];
+}
+
 } // namespace omnisketch
