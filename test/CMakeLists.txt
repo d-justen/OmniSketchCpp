@@ -19,6 +19,7 @@ set(TEST_SOURCES
         min_hash_sketch_test.hpp
         omni_sketch_test.cpp
         plan_generator_test.cpp
+        query_graph_test.cpp
 )
 
 add_executable(unit_tests ${TEST_SOURCES})

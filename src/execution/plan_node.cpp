@@ -26,13 +26,13 @@ void PlanNode::FindMatchesInNextJoin(std::vector<OmniSketchProbeResultSet> &filt
                                      size_t current_n_max, std::vector<double> &match_counts,
                                      OmniSketchCell &result) const {
 	for (auto &item : filter_results[join_idx].results) {
-		auto intersection = current->Intersect({current, item.rids->GetMinHashSketch()}, max_sample_count);
+		auto intersection = current->Intersect({current, item.rids->GetMinHashSketch()}, result.MaxSampleCount());
 		if (intersection->Size() == 0) {
 			continue;
 		}
 
 		current_n_max = std::max(current_n_max, item.n_max);
-		double card_est = ((double)current_n_max / (double)max_sample_count) * (double)intersection->Size();
+		double card_est = ((double)current_n_max / (double)result.MaxSampleCount()) * (double)intersection->Size();
 		card_est = std::max(card_est, (double)intersection->Size());
 		match_counts[join_idx] += card_est;
 
@@ -76,14 +76,18 @@ std::shared_ptr<OmniSketchCell> PlanNode::Estimate() const {
 		                      *filter.probe_values));
 	}
 
+	if (min_max_sample_count == UINT64_MAX) {
+		min_max_sample_count = registry.GetNextBestSampleCount(table_name);
+	}
+
 	// Process Filters
-	auto result = std::make_shared<OmniSketchCell>(max_sample_count);
+	auto result = std::make_shared<OmniSketchCell>(min_max_sample_count);
 
 	if (filter_results.size() == 1) {
 		for (auto &match : filter_results.front().results) {
 			result->Combine(*match.rids);
 		}
-		result->SetRecordCount((size_t)std::round((double)result->RecordCount() * filter_results.front().p_sample));
+		result->SetRecordCount((size_t)std::round((double)result->RecordCount() / filter_results.front().p_sample));
 	} else if (!filter_results.empty()) {
 		std::vector<double> match_counts(filter_results.size());
 		for (auto &probe_result : filter_results.front().results) {
@@ -167,6 +171,7 @@ double PlanNode::CalculateFKFKMultiple() const {
 		const auto other_side_card_est = join.other_node->Estimate();
 		const double other_side_multiple =
 		    (double)other_side_card_est->RecordCount() / (double)join.other_node->BaseCard();
+		// TODO: This multiplication is a uniformity assumption, remove if it hurts more than it helps
 		multiple *= other_side_multiple;
 
 		const auto this_omni_sketch = registry.GetOmniSketch(table_name, join.this_foreign_key_column);
@@ -199,11 +204,17 @@ PlanNode::OmniSketchProbeResultSet PlanNode::EstimatePredicate(const std::shared
 	std::vector<std::shared_ptr<OmniSketchCell>> matches(omni_sketch->Depth());
 	for (; !probe_hash_it->IsAtEnd(); probe_hash_it->Next()) {
 		auto probe_result = omni_sketch->ProbeHash(probe_hash_it->Current(), matches);
-		size_t n_max = 0;
-		for (auto &match : matches) {
-			n_max = std::max(n_max, match->RecordCount());
+		if (probe_result->RecordCount() > 0) {
+			size_t n_max = 0;
+			for (auto &match : matches) {
+				n_max = std::max(n_max, match->RecordCount());
+			}
+			result_set.results.push_back(OmniSketchProbeResult {n_max, probe_result});
 		}
-		result_set.results.push_back(OmniSketchProbeResult {n_max, probe_result});
+	}
+
+	if (result_set.results.empty()) {
+		result_set.results.push_back(OmniSketchProbeResult {0, std::make_shared<OmniSketchCell>()});
 	}
 
 	return result_set;

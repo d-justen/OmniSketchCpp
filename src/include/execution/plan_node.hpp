@@ -44,7 +44,7 @@ protected:
 	protected:
 	const std::string table_name;
 	const size_t base_card;
-	const size_t max_sample_count;
+	size_t max_sample_count;
 
 	struct Filter {
 		std::string column_name;

@@ -8,7 +8,6 @@ namespace omnisketch {
 
 double QueryGraph::Estimate() {
 	while (graph.size() > 1) {
-		const size_t graph_size = graph.size();
 		bool removed_node = TryMergeSingleConnection();
 
 		if (!removed_node) {
@@ -72,6 +71,7 @@ void QueryGraph::RemoveEdgeOneSide(const std::string &table_name_1, const std::s
 		auto &edge = it->second;
 		if (edge.this_column_name == column_name_1 && edge.other_column_name == column_name_2) {
 			connections.erase(it);
+			break;
 		}
 	}
 	if (connections.empty() && graph.size() > 1) {
@@ -81,8 +81,10 @@ void QueryGraph::RemoveEdgeOneSide(const std::string &table_name_1, const std::s
 
 void QueryGraph::RemoveEdge(const std::string &table_name_1, const std::string &column_name_1,
                             const std::string &table_name_2, const std::string &column_name_2) {
-	RemoveEdgeOneSide(table_name_1, column_name_1, table_name_2, column_name_2);
-	RemoveEdgeOneSide(table_name_2, column_name_2, table_name_1, column_name_1);
+	auto t1 = table_name_1, c1 = column_name_1, t2 = table_name_2, c2 = column_name_2;
+
+	RemoveEdgeOneSide(t1, c1, t2, c2);
+	RemoveEdgeOneSide(t2, c2, t1, c1);
 }
 
 RelationNode &QueryGraph::GetOrCreateNode(const std::string &table_name) {
@@ -155,11 +157,6 @@ bool QueryGraph::TryMergeSingleFkFkConnection() {
 
 			auto &registry = Registry::Get();
 			size_t sample_count = UINT64_MAX;
-
-			for (auto &filter : node.filters) {
-				auto omni_sketch = registry.GetOmniSketch(this_table_name, filter.column_name);
-				sample_count = std::min(sample_count, omni_sketch->MinHashSketchSize());
-			}
 
 			auto plan =
 			    std::make_shared<PlanNode>(this_table_name, registry.GetBaseTableCard(this_table_name), sample_count);
@@ -307,7 +304,7 @@ void QueryGraph::MergePkSideIntoFkSide(RelationNode &relation, RelationEdge &edg
 	size_t sample_count = UINT64_MAX;
 
 	for (auto &filter : relation.filters) {
-		auto sketch = registry.FindReferencingOmniSketch(this_table_name, edge.this_column_name, edge.other_table_name);
+		auto sketch = registry.FindReferencingOmniSketch(this_table_name, filter.column_name, edge.other_table_name);
 		if (sketch) {
 			graph[edge.other_table_name].filters.push_back(
 			    TableFilter {filter.column_name, filter.probe_set, this_table_name});

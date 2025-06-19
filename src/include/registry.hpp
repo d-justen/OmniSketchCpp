@@ -104,6 +104,11 @@ public:
 		return sketches[table_name].begin()->second.main_sketch->GetRids();
 	}
 
+	size_t GetNextBestSampleCount(const std::string &table_name) {
+		assert(sketches.find(table_name) != sketches.end());
+		return sketches[table_name].begin()->second.main_sketch->MinHashSketchSize();
+	}
+
 	std::shared_ptr<OmniSketchCell> TryProduceReferencingRidSample(const std::string &table_name,
 	                                                               const std::string &referencing_table_name) {
 		auto entry = sketches.find(table_name);

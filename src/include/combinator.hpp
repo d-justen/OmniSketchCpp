@@ -90,7 +90,6 @@ protected:
 	size_t max_sample_count;
 	std::vector<std::shared_ptr<OmniSketch>> sketch_filters;
 	double multiplier = 1;
-	std::map<>
 
 protected:
 	void FindMatchesInNextJoin(const std::shared_ptr<MinHashSketch> &current, size_t join_idx, size_t current_n_max,
