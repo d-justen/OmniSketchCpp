@@ -41,6 +41,7 @@ TEST(QueryGraphTest, MinimalPlanWithFKsAndCycle) {
 	graph_2.AddConstantPredicate("R", "att", pred);
 	result = graph_2.Estimate();
 	EXPECT_GE(result, 0.0);
+	registry.Clear();
 }
 
 TEST(QueryGraphTest, MinimalPlanWithFKsAndCycleSecondary) {
@@ -95,4 +96,5 @@ TEST(QueryGraphTest, MinimalPlanWithFKsAndCycleSecondary) {
 	graph_2.AddConstantPredicate("R", "att", pred);
 	result = graph_2.Estimate();
 	EXPECT_GE(result, 0.0);
+	registry.Clear();
 }

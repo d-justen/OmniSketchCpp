@@ -42,6 +42,7 @@ TEST(PlanGeneratorTest, StarShape) {
 	combinator_fact->AddPredicate(fact_fk_t, combinator_t->ComputeResult(UINT64_MAX));
 	auto result_2 = combinator_fact->ComputeResult(UINT64_MAX);
 	EXPECT_EQ(result, result_2->RecordCount());
+	registry.Clear();
 }
 
 TEST(PlanGeneratorTest, FKFKTwoRelations) {
@@ -67,6 +68,7 @@ TEST(PlanGeneratorTest, FKFKTwoRelations) {
 	gen.AddFKFKJoin("R", "fk_col", "S", "fk_col");
 	const double result = gen.EstimateCardinality();
 	EXPECT_GT(result, 0.0);
+	registry.Clear();
 }
 
 TEST(PlanGeneratorTest, FKFKTriangle) {
@@ -99,4 +101,5 @@ TEST(PlanGeneratorTest, FKFKTriangle) {
 	gen.AddFKFKJoin("S", "fk_col", "T", "fk_col");
 	const double result = gen.EstimateCardinality();
 	EXPECT_GT(result, 0.0);
+	registry.Clear();
 }

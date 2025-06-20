@@ -143,6 +143,10 @@ public:
 		return result;
 	}
 
+	void Clear() {
+		sketches.clear();
+	}
+
 private:
 	Registry();
 	std::unordered_map<std::string, TableEntry> sketches;
