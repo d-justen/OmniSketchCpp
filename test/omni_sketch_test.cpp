@@ -81,3 +81,19 @@ TEST(OmniSketchTest, ForeignSortedOmniSketch) {
 
 	auto probe_result = ref_sketch->Probe(0);
 }
+
+TEST(OmniSketchTest, LikePredicate) {
+	auto sketch = std::make_shared<omnisketch::TypedPointOmniSketch<std::string>>(4, 3, 8);
+	sketch->AddRecord("cabab", 0);
+	sketch->AddRecord("rayex", 1);
+	sketch->AddRecord("xabab", 2);
+	sketch->AddRecord("fasuy", 3);
+	sketch->AddRecord("lakab", 4);
+	sketch->AddRecord("cahob", 5);
+	sketch->AddRecord("nauaw", 6);
+	sketch->AddRecord("nabab", 7);
+
+	auto card_est = sketch->S_Like("%a_a%");
+	EXPECT_EQ(card_est->RecordCount(), 5);
+	EXPECT_EQ(card_est->SampleCount(), 5);
+}
