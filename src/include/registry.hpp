@@ -101,11 +101,23 @@ public:
 	// TODO: Taking any sketch for a rid sample could be a bad idea - what if it has many nulls? -> Create OS on rids!
 	std::shared_ptr<OmniSketchCell> ProduceRidSample(const std::string &table_name) {
 		assert(sketches.find(table_name) != sketches.end());
+		for (auto& column_sketch : sketches[table_name]) {
+			if (column_sketch.first.find("__translator") != std::string::npos) {
+				continue;
+			}
+			return column_sketch.second.main_sketch->GetRids();
+		}
 		return sketches[table_name].begin()->second.main_sketch->GetRids();
 	}
 
 	size_t GetNextBestSampleCount(const std::string &table_name) {
 		assert(sketches.find(table_name) != sketches.end());
+		for (auto& column_sketch : sketches[table_name]) {
+			if (column_sketch.first.find("__translator") != std::string::npos) {
+				continue;
+			}
+			return column_sketch.second.main_sketch->MinHashSketchSize();
+		}
 		return sketches[table_name].begin()->second.main_sketch->MinHashSketchSize();
 	}
 

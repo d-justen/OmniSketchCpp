@@ -56,6 +56,7 @@ set(SOURCE_FILES
         src/csv_importer.cpp
         src/plan_generator.cpp
         src/registry.cpp
+        src/min_hash_sketch/min_hash_sample.cpp
 )
 
 add_library(omnisketch STATIC ${SOURCE_FILES})

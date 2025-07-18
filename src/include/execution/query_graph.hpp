@@ -40,6 +40,9 @@ public:
 	void AddFkFkJoin(const std::string &table_name_1, const std::string &column_name_1, const std::string &table_name_2,
 	                 const std::string &column_name_2);
 
+public:
+	void RunDpSizeAlgo();
+
 protected:
 	void AddEdge(const std::string &table_name_1, const std::string &column_name_1, const std::string &table_name_2,
 	             const std::string &column_name_2);

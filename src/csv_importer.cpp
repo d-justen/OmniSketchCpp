@@ -42,6 +42,30 @@ CreateExtendingSketchAndFunc(const std::string &table_name, const std::string &c
 	}
 }
 
+bool ReadLogicalLine(std::ifstream& in, std::string& lineOut) {
+	lineOut.clear();
+	bool escaping = false;
+
+	char c;
+	while (in.get(c)) {
+		if (escaping) {
+			lineOut += '\\';  // preserve the backslash
+			lineOut += c;     // preserve escaped char (e.g., 'n')
+			escaping = false;
+		} else if (c == '\\') {
+			escaping = true;
+		} else if (c == '\n') {
+			// Unescaped newline: end of logical line
+			return true;
+		} else {
+			lineOut += c;
+		}
+	}
+
+	// If we reached EOF and accumulated content, return the final line
+	return !lineOut.empty();
+}
+
 void CSVImporter::ImportTable(const std::string &path, const std::string &table_name,
                               const std::vector<std::string> &column_names,
                               const std::vector<std::string> &referencing_table_names,
@@ -81,12 +105,29 @@ void CSVImporter::ImportTable(const std::string &path, const std::string &table_
 		}
 	}
 
+	// TODO: Remove this hack
+	std::map<size_t,std::function<void(const std::string &, const size_t)>> more_insert_funcs;
+	for (size_t i = 1; i < column_names.size(); i++) {
+		auto& column_name = column_names[i];
+		if (column_name == "lo_orderdate" || column_name == "lo_partkey" || column_name == "lo_custkey" || column_name == "lo_suppkey") {
+			auto new_column_name = column_name + "__translator";
+			OmniSketchConfig config;
+			config.SetWidth(8192);
+			config.depth = 1;
+			config.sample_count = 2;
+			more_insert_funcs.emplace(i - 1, CreateExtendingSketchAndFunc<size_t>(table_name, new_column_name, {}, {}, config));
+		}
+	}
+
 	std::ifstream table_stream(path);
 	std::string line;
-	while (std::getline(table_stream, line)) {
+	while (ReadLogicalLine(table_stream, line)) {
 		auto tokens = Split(line);
 		for (size_t i = 0; i < column_names.size() - 1; i++) {
 			insert_funcs[i](tokens[i + 1], std::stoul(tokens[0]));
+			if (more_insert_funcs.find(i) != more_insert_funcs.end()) {
+				more_insert_funcs[i](tokens[i+1], std::stoul(tokens[0]));
+			}
 		}
 	}
 
@@ -95,6 +136,8 @@ void CSVImporter::ImportTable(const std::string &path, const std::string &table_
 		Registry::Get().GetOmniSketch(table_name, column_names[i])->Flatten();
 	}
 }
+
+
 
 std::pair<std::vector<std::string>, std::vector<std::string>>
 CSVImporter::ExtractReferencingTables(const std::string &input) {
@@ -260,8 +303,7 @@ std::shared_ptr<OmniSketchCell> ConvertSet(const std::string &table_name, const 
 }
 
 std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_query_file,
-                                                   const std::shared_ptr<OmniSketchCombinator> &combinator,
-                                                   bool use_ref_sketches) {
+                                                   const std::shared_ptr<OmniSketchCombinator> &, bool) {
 	std::ifstream query_stream(path_to_query_file);
 	std::string line;
 
@@ -271,7 +313,7 @@ std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_qu
 		auto vals = Split(line, '|');
 		assert(vals.size() == 3);
 		CountQuery query;
-		query.plan = PlanGenerator(combinator, use_ref_sketches);
+		query.plan = QueryGraph();
 		query.cardinality = std::stoul(vals[2]);
 
 		const auto joins = Split(vals[0]);
@@ -283,11 +325,12 @@ std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_qu
 			assert(left_side.size() == 2 && right_side.size() == 2);
 			const bool left_is_fk_side = Registry::Get().HasOmniSketch(left_side[0], left_side[1]);
 			const bool right_is_fk_side = Registry::Get().HasOmniSketch(right_side[0], right_side[1]);
-			assert((left_is_fk_side && !right_is_fk_side) || (!left_is_fk_side && right_is_fk_side));
-			if (left_is_fk_side) {
-				query.plan.AddJoin(left_side[0], left_side[1], right_side[0]);
+			if (left_is_fk_side && !right_is_fk_side) {
+				query.plan.AddPkFkJoin(left_side[0], left_side[1], right_side[0]);
+			} else if (right_is_fk_side && !left_is_fk_side) {
+				query.plan.AddPkFkJoin(right_side[0], right_side[1], left_side[0]);
 			} else {
-				query.plan.AddJoin(right_side[0], right_side[1], left_side[0]);
+				query.plan.AddFkFkJoin(left_side[0], left_side[1], right_side[0], right_side[1]);
 			}
 		}
 
@@ -306,12 +349,12 @@ std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_qu
 			const auto &value = predicates[predicate_idx + 2];
 
 			if (operand == "=") {
-				query.plan.AddPredicate(table_name, column_name, ConvertPoint(table_name, column_name, value));
+				query.plan.AddConstantPredicate(table_name, column_name, ConvertPoint(table_name, column_name, value));
 			} else if (operand == ">" || operand == ">=") {
 				const bool lb_excl = operand == ">";
 				if (lt_predicates.find(column_id) != lt_predicates.end()) {
 					const auto &lt_predicate = lt_predicates[column_id];
-					query.plan.AddPredicate(
+					query.plan.AddConstantPredicate(
 					    table_name, column_name,
 					    ConvertRange(table_name, column_name, value, lt_predicate.first, lb_excl, lt_predicate.second));
 					lt_predicates.erase(column_id);
@@ -322,7 +365,7 @@ std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_qu
 				const bool ub_excl = operand == ">";
 				if (gt_predicates.find(column_id) != gt_predicates.end()) {
 					auto &gt_predicate = gt_predicates[column_id];
-					query.plan.AddPredicate(
+					query.plan.AddConstantPredicate(
 					    table_name, column_name,
 					    ConvertRange(table_name, column_name, gt_predicate.first, value, gt_predicate.second, ub_excl));
 					gt_predicates.erase(column_id);
@@ -331,7 +374,7 @@ std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_qu
 				}
 			} else if (operand == "E") {
 				const auto values = Split(value, ';');
-				query.plan.AddPredicate(table_name, column_name, ConvertSet(table_name, column_name, values));
+				query.plan.AddConstantPredicate(table_name, column_name, ConvertSet(table_name, column_name, values));
 			} else {
 				throw std::logic_error("Unknown operand");
 			}
@@ -339,16 +382,16 @@ std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_qu
 
 		for (auto &gt_predicate : gt_predicates) {
 			const auto table_column = Split(gt_predicate.first, '.');
-			query.plan.AddPredicate(table_column[0], table_column[1],
-			                        ConvertRange(table_column[0], table_column[1], gt_predicate.second.first, "",
-			                                     gt_predicate.second.second, false));
+			query.plan.AddConstantPredicate(table_column[0], table_column[1],
+			                                ConvertRange(table_column[0], table_column[1], gt_predicate.second.first,
+			                                             "", gt_predicate.second.second, false));
 		}
 
 		for (auto &lt_predicate : lt_predicates) {
 			const auto table_column = Split(lt_predicate.first, '.');
-			query.plan.AddPredicate(table_column[0], table_column[1],
-			                        ConvertRange(table_column[0], table_column[1], "", lt_predicate.second.first, false,
-			                                     lt_predicate.second.second));
+			query.plan.AddConstantPredicate(table_column[0], table_column[1],
+			                                ConvertRange(table_column[0], table_column[1], "",
+			                                             lt_predicate.second.first, false, lt_predicate.second.second));
 		}
 
 		queries.push_back(query);
@@ -364,9 +407,29 @@ std::vector<std::string> CSVImporter::Split(const std::string &line, char sep) {
 	std::stringstream ss(line);
 	std::string token;
 
-	while (std::getline(ss, token, sep)) {
-		tokens.push_back(token);
+	bool in_escape = false;
+
+	for (size_t i = 0; i < line.size(); ++i) {
+		char c = line[i];
+
+		if (c == '"') {
+			if (!line.empty() && line.back() == '"') {
+				// Double escape
+				token += c;
+			}
+			in_escape = !in_escape;
+		} else if (c == sep) {
+			if (in_escape) {
+				token += c;
+			} else {
+				tokens.push_back(token);
+				token.clear();
+			}
+		} else {
+			token += c;
+		}
 	}
+	tokens.push_back(token);
 
 	return tokens;
 }

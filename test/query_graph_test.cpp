@@ -98,3 +98,50 @@ TEST(QueryGraphTest, MinimalPlanWithFKsAndCycleSecondary) {
 	EXPECT_GE(result, 0.0);
 	registry.Clear();
 }
+TEST(QueryGraphTest, MultiPKGraph) {
+	auto &registry = omnisketch::Registry::Get();
+	auto r_id = registry.CreateOmniSketch<size_t>("R", "id");
+
+	auto s_att = registry.CreateOmniSketch<size_t>("S", "att");
+	auto t_att = registry.CreateOmniSketch<size_t>("T", "att");
+	auto u_att = registry.CreateOmniSketch<size_t>("U", "att");
+
+	for (size_t i = 0; i < 1000; i++) {
+		r_id->AddRecord(i, i);
+		s_att->AddRecord(i % 4, i);
+		t_att->AddRecord(i % 2, i);
+		t_att->AddRecord(i % 8, i);
+	}
+
+	omnisketch::QueryGraph graph;
+	auto pred = std::make_shared<omnisketch::OmniSketchCell>(1);
+	pred->AddRecord(omnisketch::Value::From(1).GetHash());
+	graph.AddConstantPredicate("T", "att", pred);
+	graph.AddPkFkJoin("S", "att", "R");
+	graph.AddPkFkJoin("T", "att", "R");
+	graph.AddPkFkJoin("U", "att", "R");
+	auto result = graph.Estimate();
+	EXPECT_GE(result, 0.0);
+
+
+	auto r_id_s =
+		registry.CreateExtendingOmniSketch<omnisketch::PreJoinedOmniSketch<size_t>, size_t>("R", "id", "S", "att");
+	auto r_id_t =
+		registry.CreateExtendingOmniSketch<omnisketch::PreJoinedOmniSketch<size_t>, size_t>("R", "id", "S", "att");
+
+	for (size_t i = 0; i < 1000; i++) {
+		r_id_s->AddRecord(i, i);
+		r_id_t->AddRecord(i, i);
+	}
+
+	graph = omnisketch::QueryGraph();
+	graph.AddConstantPredicate("R", "id", pred);
+	graph.AddPkFkJoin("S", "att", "R");
+	graph.AddPkFkJoin("T", "att", "R");
+	graph.AddPkFkJoin("U", "att", "R");
+
+	result = graph.Estimate();
+	EXPECT_GE(result, 0.0);
+
+	registry.Clear();
+}

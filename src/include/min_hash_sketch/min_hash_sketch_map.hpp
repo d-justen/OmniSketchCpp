@@ -9,34 +9,32 @@ public:
 	using HashIter = std::set<uint64_t>::iterator;
 	class SketchIterator : public MinHashSketch::SketchIterator {
 	public:
-		SketchIterator(std::map<uint64_t, HashIter>::const_iterator map_it_p,
-		               std::set<uint64_t>::const_iterator set_it_p, size_t value_count_p)
-		    : map_it(map_it_p), set_it(set_it_p), offset(0), value_count(value_count_p) {
+		SketchIterator(std::map<uint64_t, uint64_t>::const_iterator map_it_p,
+		               size_t value_count_p)
+		    : map_it(map_it_p), offset(0), value_count(value_count_p) {
 		}
 		void Next() override {
 			++offset;
-			++set_it;
+			++map_it;
 		}
 		uint64_t Current() override {
-			return *set_it;
+			return map_it->first;
+		}
+		uint64_t CurrentValueOrDefault(uint64_t) override {
+			return map_it->second;
 		}
 		size_t CurrentIdx() override {
 			return offset;
 		}
 		std::pair<uint64_t, uint64_t> CurrentKeyVal() {
-			return {map_it->first, *map_it->second};
-		}
-		void NextKeyVal() {
-			++offset;
-			++map_it;
+			return {map_it->first, map_it->second};
 		}
 		bool IsAtEnd() override {
 			return offset == value_count;
 		}
 
 	private:
-		std::map<uint64_t, HashIter>::const_iterator map_it;
-		std::set<uint64_t>::const_iterator set_it;
+		std::map<uint64_t, uint64_t>::const_iterator map_it;
 		size_t offset;
 		size_t value_count;
 	};
@@ -52,7 +50,7 @@ public:
 	explicit MinHashSketchMap(size_t max_count_p) : max_count(max_count_p) {
 	}
 
-	void AddRecord(uint64_t order_key, uint64_t hash);
+	void AddRecord(uint64_t hash, uint64_t value);
 	void AddRecord(uint64_t hash) override;
 	void EraseRecord(uint64_t hash) override;
 	size_t Size() const override;
@@ -67,12 +65,15 @@ public:
 	size_t EstimateByteSize() const override;
 	std::unique_ptr<MinHashSketch::SketchIterator> Iterator() const override;
 	std::unique_ptr<MinHashSketch::SketchIterator> Iterator(size_t max_sample_count) const override;
-	std::set<uint64_t> &Data();
-	const std::set<uint64_t> &Data() const;
+	std::map<uint64_t, uint64_t> &Data();
+	const std::map<uint64_t, uint64_t> &Data() const;
+	void ShrinkToSize() {
+		max_count = data.size();
+	}
 
+	static std::shared_ptr<MinHashSketchMap> IntersectMap(std::vector<std::shared_ptr<MinHashSketch>> &sketches, size_t n_max, size_t max_sample_size = 0);
 private:
-	std::map<uint64_t, HashIter> hash_index;
-	std::set<uint64_t> data;
+	std::map<uint64_t, uint64_t> data;
 	size_t max_count;
 };
 

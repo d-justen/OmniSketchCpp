@@ -195,9 +195,9 @@ using EXHAUSTIVE_CORR = std::integral_constant<int64_t, static_cast<int64_t>(Com
 
 BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBU, SSB, UNCORRELATED)
 (benchmark::State &state) {
-	auto &query = GetQuery(SSBQueryIdx(state.range()));
 	for (auto _ : state) {
-		auto result = query.plan.EstimateCardinality();
+		auto query = GetQuery(SSBQueryIdx(state.range()));
+		auto result = query.plan.Estimate();
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
@@ -207,9 +207,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBU, SSB, UNCORRELATED)
 
 BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBE, SSB, EXHAUSTIVE)
 (benchmark::State &state) {
-	auto &query = GetQuery(SSBQueryIdx(state.range()));
 	for (auto _ : state) {
-		auto result = query.plan.EstimateCardinality();
+		auto query = GetQuery(SSBQueryIdx(state.range()));
+		auto result = query.plan.Estimate();
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
@@ -219,9 +219,10 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBE, SSB, EXHAUSTIVE)
 
 BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBCE, SSB, EXHAUSTIVE_CORR)
 (benchmark::State &state) {
-	auto &query = GetQuery(SSBQueryIdx(state.range()));
 	for (auto _ : state) {
-		auto result = query.plan.EstimateCardinality();
+		auto query = GetQuery(SSBQueryIdx(state.range()));
+		query.plan.RunDpSizeAlgo();
+		auto result = query.plan.Estimate();
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
@@ -231,9 +232,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBCE, SSB, EXHAUSTIVE_CORR)
 
 BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewU, SSB_SKEW, UNCORRELATED)
 (benchmark::State &state) {
-	auto &query = GetQuery(SSBQueryIdx(state.range()));
 	for (auto _ : state) {
-		auto result = query.plan.EstimateCardinality();
+		auto query = GetQuery(SSBQueryIdx(state.range()));
+		auto result = query.plan.Estimate();
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
@@ -243,9 +244,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewU, SSB_SKEW, UNCORRELAT
 
 BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewE, SSB_SKEW, EXHAUSTIVE)
 (benchmark::State &state) {
-	auto &query = GetQuery(SSBQueryIdx(state.range()));
 	for (auto _ : state) {
-		auto result = query.plan.EstimateCardinality();
+		auto query = GetQuery(SSBQueryIdx(state.range()));
+		auto result = query.plan.Estimate();
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
@@ -255,9 +256,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewE, SSB_SKEW, EXHAUSTIVE
 
 BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewCE, SSB_SKEW, EXHAUSTIVE_CORR)
 (benchmark::State &state) {
-	auto &query = GetQuery(SSBQueryIdx(state.range()));
 	for (auto _ : state) {
-		auto result = query.plan.EstimateCardinality();
+		auto query = GetQuery(SSBQueryIdx(state.range()));
+		auto result = query.plan.Estimate();
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
@@ -268,9 +269,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewCE, SSB_SKEW, EXHAUSTIV
 BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewSubU, SSB_SKEW, UNCORRELATED)
 (benchmark::State &state) {
 	auto queries = AllSSBSubQueries(state.range());
-	auto &query = GetQuery(13 + queries[state.range(1)]);
 	for (auto _ : state) {
-		auto result = query.plan.EstimateCardinality();
+		auto query = GetQuery(13 + queries[state.range(1)]);
+		auto result = query.plan.Estimate();
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
@@ -281,9 +282,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewSubU, SSB_SKEW, UNCORRE
 BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewSubE, SSB_SKEW, EXHAUSTIVE)
 (benchmark::State &state) {
 	auto queries = AllSSBSubQueries(state.range());
-	auto &query = GetQuery(13 + queries[state.range(1)]);
 	for (auto _ : state) {
-		auto result = query.plan.EstimateCardinality();
+		auto query = GetQuery(13 + queries[state.range(1)]);
+		auto result = query.plan.Estimate();
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
@@ -294,9 +295,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewSubE, SSB_SKEW, EXHAUST
 BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewSubCE, SSB_SKEW, EXHAUSTIVE_CORR)
 (benchmark::State &state) {
 	auto queries = AllSSBSubQueries(state.range());
-	auto &query = GetQuery(13 + queries[state.range(1)]);
 	for (auto _ : state) {
-		auto result = query.plan.EstimateCardinality();
+		auto query = GetQuery(13 + queries[state.range(1)]);
+		auto result = query.plan.Estimate();
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
@@ -306,9 +307,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewSubCE, SSB_SKEW, EXHAUS
 
 BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, JOBLightU, JOB_LIGHT, UNCORRELATED)
 (benchmark::State &state) {
-	auto &query = GetQuery(state.range());
 	for (auto _ : state) {
-		auto result = query.plan.EstimateCardinality();
+		auto query = GetQuery(state.range());
+		auto result = query.plan.Estimate();
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
@@ -318,9 +319,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, JOBLightU, JOB_LIGHT, UNCORREL
 
 BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, JOBLightE, JOB_LIGHT, EXHAUSTIVE)
 (benchmark::State &state) {
-	auto &query = GetQuery(state.range());
 	for (auto _ : state) {
-		auto result = query.plan.EstimateCardinality();
+		auto query = GetQuery(state.range());
+		auto result = query.plan.Estimate();
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
@@ -330,15 +331,25 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, JOBLightE, JOB_LIGHT, EXHAUSTI
 
 BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, JOBLightCE, JOB_LIGHT, EXHAUSTIVE_CORR)
 (benchmark::State &state) {
-	auto &query = GetQuery(state.range());
 	for (auto _ : state) {
-		auto result = query.plan.EstimateCardinality();
+		auto query = GetQuery(state.range());
+		auto result = query.plan.Estimate();
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
 		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
 	}
 }
+
+static void JOBQ8cDPSize(benchmark::State &state) {
+	CSVImporter::ImportTables("../data/imdb/q8c/definition.csv");
+	auto queries = CSVImporter::ImportQueries("../data/imdb/q8c/query.csv", std::make_shared<ExhaustiveCombinator>(), false);
+	assert(queries.size() == 1);
+	for (auto _ : state) {
+		queries.front().plan.RunDpSizeAlgo();
+	}
+}
+
 
 static void SSBSkewSubArgs(benchmark::internal::Benchmark *b) {
 	for (size_t i = 0; i < 5; i++) {
@@ -350,8 +361,8 @@ static void SSBSkewSubArgs(benchmark::internal::Benchmark *b) {
 }
 
 BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBU)->ArgsProduct({AllSSBQueries()})->Iterations(5);
-BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBE)->ArgsProduct({AllSSBQueries()})->Iterations(5);
-BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBCE)->ArgsProduct({AllSSBQueries()})->Iterations(5);
+BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBE)->ArgsProduct({AllSSBQueries()})->Iterations(1);
+BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBCE)->ArgsProduct({AllSSBQueries()})->Iterations(1);
 BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewU)->ArgsProduct({AllSSBQueries()})->Iterations(5);
 BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewE)->ArgsProduct({AllSSBQueries()})->Iterations(5);
 BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewCE)->ArgsProduct({AllSSBQueries()})->Iterations(5);
@@ -361,5 +372,6 @@ BENCHMARK_REGISTER_F(JoinBenchmarkFixture, SSBSkewSubCE)->Apply(SSBSkewSubArgs)-
 BENCHMARK_REGISTER_F(JoinBenchmarkFixture, JOBLightU)->ArgsProduct({AllJOBLightQueries()})->Iterations(5);
 BENCHMARK_REGISTER_F(JoinBenchmarkFixture, JOBLightE)->ArgsProduct({AllJOBLightQueries()})->Iterations(5);
 BENCHMARK_REGISTER_F(JoinBenchmarkFixture, JOBLightCE)->ArgsProduct({AllJOBLightQueries()})->Iterations(5);
+BENCHMARK(JOBQ8cDPSize)->Iterations(1);
 
 BENCHMARK_MAIN();

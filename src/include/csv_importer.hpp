@@ -1,5 +1,6 @@
 #pragma once
 
+#include "execution/query_graph.hpp"
 #include "omni_sketch/foreign_sorted_omni_sketch.hpp"
 #include "omni_sketch/pre_joined_omni_sketch.hpp"
 #include "registry.hpp"
@@ -14,7 +15,7 @@ namespace omnisketch {
 enum class ColumnType { INT, UINT, DOUBLE, VARCHAR };
 
 struct CountQuery {
-	PlanGenerator plan;
+	QueryGraph plan;
 	size_t cardinality = 0;
 };
 

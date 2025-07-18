@@ -17,6 +17,9 @@ public:
 		size_t CurrentIdx() override {
 			return offset;
 		};
+		uint64_t CurrentValueOrDefault(uint64_t default_val) override {
+			return default_val;
+		}
 		void Next() override {
 			++offset;
 			++it;

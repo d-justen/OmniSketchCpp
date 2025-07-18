@@ -2,6 +2,7 @@
 
 #include "registry.hpp"
 
+#include <iostream>
 #include <queue>
 
 namespace omnisketch {
@@ -119,7 +120,7 @@ bool QueryGraph::TryMergeSingleConnection() {
 }
 
 void QueryGraph::AddFilterToPlan(PlanNode &plan, const TableFilter &filter) {
-	if (filter.other_side_plan) {
+	if (filter.other_side_plan && !filter.column_name.empty()) {
 		assert(!filter.fk_column_name.empty());
 		plan.AddFKFKJoinExpansion(filter.column_name, filter.other_side_plan, filter.fk_column_name);
 	} else if (!filter.original_table_name.empty()) {
@@ -194,11 +195,6 @@ bool QueryGraph::TryMergeMultiPkConnection() {
 		auto &registry = Registry::Get();
 		size_t sample_count = UINT64_MAX;
 
-		for (auto &filter : node.filters) {
-			auto omni_sketch = registry.GetOmniSketch(this_table_name, filter.column_name);
-			sample_count = std::min(sample_count, omni_sketch->MinHashSketchSize());
-		}
-
 		auto plan =
 		    std::make_shared<PlanNode>(this_table_name, registry.GetBaseTableCard(this_table_name), sample_count);
 		for (auto &filter : node.filters) {
@@ -206,6 +202,10 @@ bool QueryGraph::TryMergeMultiPkConnection() {
 		}
 
 		auto cycles = FindCycles(this_table_name);
+		if (cycles.empty()) {
+			continue;
+		}
+
 		if (cycles.size() == 1) {
 			// We can just merge this table into its neighbors
 			while (!node.connections.empty()) {
@@ -289,7 +289,9 @@ std::vector<std::vector<std::string>> QueryGraph::FindCycles(const std::string &
 				connected_relations.erase(it);
 			}
 		}
-		result.push_back(partial_result);
+		if (partial_result.size() > 1) {
+			result.push_back(partial_result);
+		}
 	}
 
 	return result;
@@ -304,6 +306,11 @@ void QueryGraph::MergePkSideIntoFkSide(RelationNode &relation, RelationEdge &edg
 	size_t sample_count = UINT64_MAX;
 
 	for (auto &filter : relation.filters) {
+		if (filter.probe_set == nullptr) {
+			// This is a primary key expansion
+			remaining_filters.push_back(filter);
+			continue;
+		}
 		auto sketch = registry.FindReferencingOmniSketch(this_table_name, filter.column_name, edge.other_table_name);
 		if (sketch) {
 			graph[edge.other_table_name].filters.push_back(
@@ -376,6 +383,171 @@ bool QueryGraph::TryExpandPkConnection() {
 		}
 	}
 	return false;
+}
+
+struct JoinNode {
+	std::string name;
+	std::shared_ptr<JoinNode> left_in;
+	std::shared_ptr<JoinNode> right_in;
+};
+
+struct QueryPlan {
+	std::shared_ptr<JoinNode> plan;
+	std::set<std::string> relations;
+	double card_est;
+	double cost;
+};
+
+std::string TreeToString(JoinNode *root) {
+	if (!root)
+		return "";
+
+	std::string result = root->name;
+
+	// If there's a left child or a right child, show left
+	if (root->left_in) {
+		assert(root->right_in);
+		result += "(" + TreeToString(&*root->left_in) + "," + TreeToString(&*root->right_in) + ")";
+	}
+
+	return result;
+}
+
+void QueryGraph::RunDpSizeAlgo() {
+	auto &registry = Registry::Get();
+	std::unordered_map<size_t, std::vector<QueryPlan>> best_plans;
+
+	for (auto &node : graph) {
+		QueryPlan plan;
+		plan.plan = std::make_shared<JoinNode>(JoinNode {node.first, nullptr, nullptr});
+		plan.relations.insert(node.first);
+		if (!graph[node.first].filters.empty()) {
+			QueryGraph g;
+			g.graph[node.first] = graph[node.first];
+
+			auto begin = std::chrono::steady_clock::now();
+			plan.card_est = g.Estimate();
+			auto end = std::chrono::steady_clock::now();
+			std::chrono::duration<double, std::milli> duration = end - begin;
+
+			std::cout << "[";
+			for (auto &r : plan.relations) {
+				std::cout << r << ", ";
+			}
+			std::cout << "], CardEst: " << plan.card_est << ", Time (ms): " << duration.count() << "\n";
+		} else {
+			plan.card_est = (double)registry.GetBaseTableCard(node.first);
+		}
+
+		plan.cost = 0;
+		best_plans[1].push_back(plan);
+	}
+
+	for (size_t current_size = 2; current_size <= graph.size(); current_size++) {
+		for (size_t left_plan_size = 1; left_plan_size <= current_size / 2; left_plan_size++) {
+			const size_t right_plan_size = current_size - left_plan_size;
+			// Find all plans of that size in best_plans
+			for (size_t left_plan_index = 0; left_plan_index < best_plans[left_plan_size].size(); left_plan_index++) {
+				auto &left_plan = best_plans[left_plan_size][left_plan_index];
+				size_t right_plan_index = left_plan_size == right_plan_size ? left_plan_index + 1 : 0;
+
+				for (; right_plan_index < best_plans[right_plan_size].size(); right_plan_index++) {
+					auto &right_plan = best_plans[right_plan_size][right_plan_index];
+					// Only continue if intersection is empty
+					std::vector<std::string> intersection;
+					std::set_intersection(left_plan.relations.begin(), left_plan.relations.end(),
+					                      right_plan.relations.begin(), right_plan.relations.end(),
+					                      std::back_inserter(intersection));
+					if (!intersection.empty()) {
+						continue;
+					}
+
+					// Only go on if there is a connection between the plans
+					bool plans_are_connected = false;
+					for (auto &relation_name : left_plan.relations) {
+						auto &node = graph[relation_name];
+						for (auto &connection : node.connections) {
+							if (right_plan.relations.find(connection.first) != right_plan.relations.end()) {
+								plans_are_connected = true;
+								break;
+							}
+						}
+						if (plans_are_connected) {
+							break;
+						}
+					}
+
+					if (!plans_are_connected) {
+						continue;
+					}
+
+					// Let's create the join tree
+					QueryPlan plan;
+					plan.relations.insert(left_plan.relations.begin(), left_plan.relations.end());
+					plan.relations.insert(right_plan.relations.begin(), right_plan.relations.end());
+
+					QueryGraph g;
+					for (auto &relation_name : plan.relations) {
+						g.graph[relation_name] = graph[relation_name];
+						// BUT remove all connections to relations that are not in current subplan
+						while (true) {
+							std::string connection_to_remove{};
+							for (auto &conn : g.graph[relation_name].connections) {
+								if (plan.relations.find(conn.first) == plan.relations.end()) {
+									connection_to_remove = conn.first;
+									break;
+								}
+							}
+							if (connection_to_remove.empty()) {
+								break;
+							} else {
+								g.graph[relation_name].connections.erase(connection_to_remove);
+							}
+						}
+					}
+
+					auto begin = std::chrono::steady_clock::now();
+					plan.card_est = g.Estimate();
+					auto end = std::chrono::steady_clock::now();
+					std::chrono::duration<double, std::milli> duration = end - begin;
+
+					plan.cost = left_plan.cost + right_plan.cost + plan.card_est;
+					auto left_in = left_plan.card_est > right_plan.card_est ? left_plan.plan : right_plan.plan;
+					auto right_in = left_plan.card_est > right_plan.card_est ? right_plan.plan : left_plan.plan;
+					plan.plan = std::make_shared<JoinNode>(JoinNode {{}, left_in, right_in});
+
+					std::cout << "[";
+					for (auto &r : plan.relations) {
+						std::cout << r << ", ";
+					}
+					std::cout << "], CardEst: " << plan.card_est << ", Time (ms): " << duration.count() <<  ", Plan: " << TreeToString(&*plan.plan) << ", Cost: " << plan.cost << "\n";
+
+					// Now see whether this is the plan with the lowest cost
+					bool has_plan = false;
+					for (auto &best_plan : best_plans[current_size]) {
+						intersection.clear();
+						std::set_intersection(plan.relations.begin(), plan.relations.end(), best_plan.relations.begin(),
+						                      best_plan.relations.end(), std::back_inserter(intersection));
+						if (intersection.size() == current_size) {
+							// Identical relations in plan!
+							has_plan = true;
+							if (best_plan.cost > plan.cost) {
+								best_plan = plan;
+								break;
+							}
+						}
+					}
+
+					if (!has_plan) {
+						best_plans[current_size].push_back(plan);
+					}
+				}
+			}
+		}
+	}
+
+	assert(best_plans[graph.size()].size() == 1);
+	std::cout << TreeToString(&*best_plans[graph.size()].front().plan) << "\n";
 }
 
 } // namespace omnisketch
