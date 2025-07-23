@@ -201,7 +201,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBU, SSB, UNCORRELATED)
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
-		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
+		state.counters["MemoryUsageMB"] =
+		    benchmark::Counter((double)Registry::Get().EstimateByteSize(), benchmark::Counter::kIsIterationInvariant,
+		                       benchmark::Counter::OneK::kIs1024);
 	}
 }
 
@@ -213,7 +215,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBE, SSB, EXHAUSTIVE)
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
-		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
+		state.counters["MemoryUsageMB"] =
+		    benchmark::Counter((double)Registry::Get().EstimateByteSize(), benchmark::Counter::kIsIterationInvariant,
+		                       benchmark::Counter::OneK::kIs1024);
 	}
 }
 
@@ -225,7 +229,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBCE, SSB, EXHAUSTIVE_CORR)
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
-		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
+		state.counters["MemoryUsageMB"] =
+		    benchmark::Counter((double)Registry::Get().EstimateByteSize(), benchmark::Counter::kIsIterationInvariant,
+		                       benchmark::Counter::OneK::kIs1024);
 	}
 }
 
@@ -237,7 +243,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewU, SSB_SKEW, UNCORRELAT
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
-		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
+		state.counters["MemoryUsageMB"] =
+		    benchmark::Counter((double)Registry::Get().EstimateByteSize(), benchmark::Counter::kIsIterationInvariant,
+		                       benchmark::Counter::OneK::kIs1024);
 	}
 }
 
@@ -249,7 +257,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewE, SSB_SKEW, EXHAUSTIVE
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
-		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
+		state.counters["MemoryUsageMB"] =
+		    benchmark::Counter((double)Registry::Get().EstimateByteSize(), benchmark::Counter::kIsIterationInvariant,
+		                       benchmark::Counter::OneK::kIs1024);
 	}
 }
 
@@ -261,7 +271,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewCE, SSB_SKEW, EXHAUSTIV
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
-		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
+		state.counters["MemoryUsageMB"] =
+		    benchmark::Counter((double)Registry::Get().EstimateByteSize(), benchmark::Counter::kIsIterationInvariant,
+		                       benchmark::Counter::OneK::kIs1024);
 	}
 }
 
@@ -274,7 +286,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewSubU, SSB_SKEW, UNCORRE
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
-		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
+		state.counters["MemoryUsageMB"] =
+		    benchmark::Counter((double)Registry::Get().EstimateByteSize(), benchmark::Counter::kIsIterationInvariant,
+		                       benchmark::Counter::OneK::kIs1024);
 	}
 }
 
@@ -287,7 +301,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewSubE, SSB_SKEW, EXHAUST
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
-		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
+		state.counters["MemoryUsageMB"] =
+		    benchmark::Counter((double)Registry::Get().EstimateByteSize(), benchmark::Counter::kIsIterationInvariant,
+		                       benchmark::Counter::OneK::kIs1024);
 	}
 }
 
@@ -300,7 +316,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, SSBSkewSubCE, SSB_SKEW, EXHAUS
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
-		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
+		state.counters["MemoryUsageMB"] =
+		    benchmark::Counter((double)Registry::Get().EstimateByteSize(), benchmark::Counter::kIsIterationInvariant,
+		                       benchmark::Counter::OneK::kIs1024);
 	}
 }
 
@@ -312,7 +330,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, JOBLightU, JOB_LIGHT, UNCORREL
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
-		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
+		state.counters["MemoryUsageMB"] =
+		    benchmark::Counter((double)Registry::Get().EstimateByteSize(), benchmark::Counter::kIsIterationInvariant,
+		                       benchmark::Counter::OneK::kIs1024);
 	}
 }
 
@@ -324,7 +344,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, JOBLightE, JOB_LIGHT, EXHAUSTI
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
-		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
+		state.counters["MemoryUsageMB"] =
+		    benchmark::Counter((double)Registry::Get().EstimateByteSize(), benchmark::Counter::kIsIterationInvariant,
+		                       benchmark::Counter::OneK::kIs1024);
 	}
 }
 
@@ -336,7 +358,9 @@ BENCHMARK_TEMPLATE_DEFINE_F(JoinBenchmarkFixture, JOBLightCE, JOB_LIGHT, EXHAUST
 		state.counters["Card"] = (double)query.cardinality;
 		state.counters["Est"] = result;
 		state.counters["QErr"] = result / (double)query.cardinality;
-		state.counters["MemoryUsageMB"] = Registry::Get().EstimateByteSize() / 1024 / 1024;
+		state.counters["MemoryUsageMB"] =
+		    benchmark::Counter((double)Registry::Get().EstimateByteSize(), benchmark::Counter::kIsIterationInvariant,
+		                       benchmark::Counter::OneK::kIs1024);
 	}
 }
 

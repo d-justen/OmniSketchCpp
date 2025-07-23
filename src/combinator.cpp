@@ -1,5 +1,8 @@
 #include "combinator.hpp"
 
+#include "omni_sketch/standard_omni_sketch.hpp"
+#include "omni_sketch/pre_joined_omni_sketch.hpp"
+
 namespace omnisketch {
 
 void ExhaustiveCombinator::AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,
@@ -40,7 +43,27 @@ void ExhaustiveCombinator::AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,
 			card_sum += probe_result->RecordCount();
 		}
 	}
-	join_sels.push_back((double)card_sum / (double)base_card / probe_sample->SamplingProbability());
+
+	double join_sel = (double)card_sum / (double)base_card / probe_sample->SamplingProbability();
+
+	if (card_sum == 0) {
+		size_t domain = 0;
+		auto typed_sketch = std::dynamic_pointer_cast<TypedPointOmniSketch<size_t>>(omni_sketch);
+		if (typed_sketch) {
+			domain = typed_sketch->GetMax() - typed_sketch->GetMin();
+		} else {
+			auto typed_pj_sketch = std::dynamic_pointer_cast<PreJoinedOmniSketch<size_t>>(omni_sketch);
+			if (typed_pj_sketch) {
+				domain = typed_pj_sketch->GetMax() - typed_pj_sketch->GetMin();
+			}
+		}
+		if (domain > 0) {
+			double avg_matches = (double )omni_sketch->RecordCount() / (double)domain;
+			join_sel = std::min(((double)probe_sample->RecordCount() * avg_matches) / (double )base_card, 1.0);
+		}
+	}
+
+	join_sels.push_back(join_sel);
 	join_key_matches.push_back(join_results);
 }
 
@@ -80,6 +103,13 @@ std::shared_ptr<OmniSketchCell> ExhaustiveCombinator::ComputeResult(size_t max_o
 			result->Combine(*match.cell);
 		}
 		result->SetRecordCount((size_t)std::round((double)result->RecordCount() / sampling_probabilities[0]));
+		if (result->RecordCount() == 0) {
+			double replacement_count = 0;
+			for (auto &match : join_key_matches.front()) {
+				replacement_count += (double)match.n_max / (double)match.cell->MaxSampleCount();
+			}
+			result->SetRecordCount((size_t)replacement_count);
+		}
 		return result;
 	}
 
@@ -95,6 +125,9 @@ std::shared_ptr<OmniSketchCell> ExhaustiveCombinator::ComputeResult(size_t max_o
 		double next_card_scaled =
 		    std::min(last_card_unscaled, match_counts[predicate_idx] / sampling_probabilities[predicate_idx]);
 		double sel = next_card_scaled / last_card_unscaled;
+		if (next_card_scaled == 0) {
+			sel = join_sels[predicate_idx];
+		}
 		result_card *= sel;
 	}
 
