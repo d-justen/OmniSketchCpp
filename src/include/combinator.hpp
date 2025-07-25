@@ -40,6 +40,7 @@ public:
 	virtual ~OmniSketchCombinator() = default;
 	virtual void AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,
 	                          std::shared_ptr<OmniSketchCell> probe_sample) = 0;
+	virtual void Finalize() = 0;
 	virtual void AddUnfilteredRids(std::shared_ptr<OmniSketch> omni_sketch) = 0;
 	virtual void AddUnfilteredRids(std::shared_ptr<OmniSketchCell> rid_sample) = 0;
 	virtual bool HasPredicates() const = 0;
@@ -74,6 +75,7 @@ public:
 	std::shared_ptr<OmniSketchCell> ComputeResult(size_t max_output_size) const override;
 	std::shared_ptr<OmniSketchCell> FilterProbeSet(std::shared_ptr<OmniSketch> omni_sketch,
 	                                               std::shared_ptr<OmniSketchCell> probe_sample) const override;
+	void Finalize() override;
 
 protected:
 	std::vector<std::vector<ExhaustiveCombinatorItem>> join_key_matches;
@@ -96,6 +98,8 @@ public:
 	std::shared_ptr<OmniSketchCell> ComputeResult(size_t max_output_size) const override;
 	std::shared_ptr<OmniSketchCell> FilterProbeSet(std::shared_ptr<OmniSketch> omni_sketch,
 	                                               std::shared_ptr<OmniSketchCell> probe_sample) const override;
+	void Finalize() override {
+	}
 
 protected:
 	std::vector<std::pair<std::shared_ptr<OmniSketch>, std::shared_ptr<OmniSketchCell>>> joins;

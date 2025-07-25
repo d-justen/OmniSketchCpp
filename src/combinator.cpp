@@ -5,6 +5,8 @@
 
 namespace omnisketch {
 
+constexpr size_t MAX_JOIN_PROBE_COUNT = 16;
+
 void ExhaustiveCombinator::AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,
                                         std::shared_ptr<OmniSketchCell> probe_sample) {
 	if (join_key_matches.empty()) {
@@ -20,7 +22,12 @@ void ExhaustiveCombinator::AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,
 
 	max_sample_count = std::min(max_sample_count, omni_sketch->MinHashSketchSize());
 	base_card = std::max(base_card, omni_sketch->RecordCount());
-	if (omni_sketch->Type() == OmniSketchType::FOREIGN_SORTED) {
+
+	if (probe_sample->SampleCount() > MAX_JOIN_PROBE_COUNT) {
+		probe_sample->SetMinHashSketch(probe_sample->GetMinHashSketch()->Resize(MAX_JOIN_PROBE_COUNT));
+	}
+
+	if (omni_sketch->Type() == OmniSketchType::FOREIGN_SORTED || probe_sample->SampleCount() == 0) {
 		sampling_probabilities.push_back(1);
 	} else {
 		sampling_probabilities.push_back(probe_sample->SamplingProbability());
@@ -32,6 +39,7 @@ void ExhaustiveCombinator::AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,
 	std::vector<std::shared_ptr<OmniSketchCell>> matches(omni_sketch->Depth());
 	auto join_key_it = probe_sample->GetMinHashSketch()->Iterator();
 	size_t card_sum = 0;
+	double min_match_count = 0;
 	for (; !join_key_it->IsAtEnd(); join_key_it->Next()) {
 		auto probe_result = omni_sketch->ProbeHash(join_key_it->Current(), matches);
 		if (probe_result->SampleCount() > 0) {
@@ -41,6 +49,12 @@ void ExhaustiveCombinator::AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,
 			}
 			join_results.emplace_back(probe_result, ExhaustiveCombinatorItem::GetNMax(matches));
 			card_sum += probe_result->RecordCount();
+		} else {
+			size_t n_min = UINT64_MAX;
+			for (auto &match : matches) {
+				n_min = std::min(match->RecordCount(), n_min);
+			}
+			min_match_count += (double)n_min / (double)matches.front()->MaxSampleCount();
 		}
 	}
 
@@ -55,11 +69,13 @@ void ExhaustiveCombinator::AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,
 			auto typed_pj_sketch = std::dynamic_pointer_cast<PreJoinedOmniSketch<size_t>>(omni_sketch);
 			if (typed_pj_sketch) {
 				domain = typed_pj_sketch->GetMax() - typed_pj_sketch->GetMin();
+			} else {
+				join_sel = min_match_count / (double)base_card;
 			}
 		}
 		if (domain > 0) {
-			double avg_matches = (double )omni_sketch->RecordCount() / (double)domain;
-			join_sel = std::min(((double)probe_sample->RecordCount() * avg_matches) / (double )base_card, 1.0);
+			double avg_matches = (double)omni_sketch->RecordCount() / (double)domain;
+			join_sel = std::min(((double)probe_sample->RecordCount() * avg_matches) / (double)base_card, 1.0);
 		}
 	}
 
@@ -108,6 +124,10 @@ std::shared_ptr<OmniSketchCell> ExhaustiveCombinator::ComputeResult(size_t max_o
 			for (auto &match : join_key_matches.front()) {
 				replacement_count += (double)match.n_max / (double)match.cell->MaxSampleCount();
 			}
+			if (replacement_count == 0) {
+				replacement_count = ((double)base_card * join_sels.front()) / sampling_probabilities.front();
+			}
+
 			result->SetRecordCount((size_t)replacement_count);
 		}
 		return result;
@@ -201,6 +221,33 @@ void ExhaustiveCombinator::AddUnfilteredRids(std::shared_ptr<OmniSketchCell> rid
 
 	join_key_matches.emplace_back();
 	join_key_matches.back().emplace_back(rid_sample, rid_sample->RecordCount());
+}
+
+void ExhaustiveCombinator::Finalize() {
+	if (join_key_matches.size() == 1) {
+		return;
+	}
+
+	std::map<double, size_t> ordered_entry_idxs;
+	for (size_t i = 0; i < join_sels.size(); i++) {
+		ordered_entry_idxs[join_sels[i]] = i;
+	}
+	std::vector<std::vector<ExhaustiveCombinatorItem>> new_items;
+	new_items.reserve(join_key_matches.size());
+	std::vector<double> new_join_sels;
+	new_join_sels.reserve(join_sels.size());
+	std::vector<double> new_sampling_probabilities;
+	new_sampling_probabilities.reserve(sampling_probabilities.size());
+
+	for (auto it = ordered_entry_idxs.rbegin(); it != ordered_entry_idxs.rend(); ++it) {
+		new_items.push_back(join_key_matches[it->second]);
+		new_join_sels.push_back(join_sels[it->second]);
+		new_sampling_probabilities.push_back(sampling_probabilities[it->second]);
+	}
+
+	join_key_matches = new_items;
+	join_sels = new_join_sels;
+	sampling_probabilities = new_sampling_probabilities;
 }
 
 void UncorrelatedCombinator::AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,

@@ -178,6 +178,7 @@ double PlanGenerator::EstimateCardinality() const {
 				const auto &fk_sketch = exec_item->probes_into.begin()->second;
 				auto &fk_side_item = exec_items[fk_table_name];
 
+				exec_item->combinator->Finalize();
 				auto pk_probe_set = exec_item->combinator->ComputeResult(UINT64_MAX);
 				if (pk_probe_set->RecordCount() == 0) {
 					return 0;
@@ -193,6 +194,7 @@ double PlanGenerator::EstimateCardinality() const {
 			if (CheckIfResolvable(exec_item)) {
 				std::shared_ptr<PlanExecItem> item_to_probe_into = nullptr;
 				std::shared_ptr<PointOmniSketch> sketch_to_probe_into = nullptr;
+				exec_item->combinator->Finalize();
 				auto pk_probe_set = exec_item->combinator->ComputeResult(UINT64_MAX);
 				if (pk_probe_set->RecordCount() == 0) {
 					return 0;
@@ -241,6 +243,7 @@ double PlanGenerator::EstimateCardinality() const {
 
 	assert(plan_item->probes_into.empty());
 	assert(plan_item->probed_from.empty());
+	plan_item->combinator->Finalize();
 	auto card_est = plan_item->combinator->ComputeResult(UINT64_MAX);
 	return (double)card_est->RecordCount();
 }
