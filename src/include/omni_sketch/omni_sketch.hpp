@@ -54,6 +54,7 @@ public:
 	void AddNullValues(size_t count) override;
 	size_t CountNulls() const override;
 	size_t RecordCount() const override;
+	void SetRecordCount(size_t record_count_p);
 	std::shared_ptr<OmniSketchCell> ProbeValue(const Value &value) const override;
 	std::shared_ptr<OmniSketchCell> ProbeHash(uint64_t hash,
 	                                          std::vector<std::shared_ptr<OmniSketchCell>> &matches) const override;
@@ -68,6 +69,7 @@ public:
 	std::shared_ptr<OmniSketchCell> GetRids() const override;
 	void Combine(const std::shared_ptr<OmniSketch> &other) override;
 	const OmniSketchCell &GetCell(size_t row_idx, size_t col_idx) const override;
+	void SetCell(size_t row_idx, size_t col_idx, std::shared_ptr<OmniSketchCell> cell);
 
 protected:
 	size_t width;

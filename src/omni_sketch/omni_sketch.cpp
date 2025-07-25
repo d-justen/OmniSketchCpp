@@ -105,18 +105,18 @@ size_t PointOmniSketch::EstimateByteSize() const {
 	/*const size_t members = 3 * sizeof(size_t) + sizeof(hash_processor) + sizeof(cells);
 	size_t cell_size = 0;
 	for (const auto &row : cells) {
-		cell_size += sizeof(row);
-		for (const auto &cell : row) {
-			cell_size += cell->EstimateByteSize();
-		}
+	    cell_size += sizeof(row);
+	    for (const auto &cell : row) {
+	        cell_size += cell->EstimateByteSize();
+	    }
 	}
 
 	return members + cell_size;*/
 	size_t hash_count = 0;
-	for (const auto& row: cells) {
-		for (const auto& cell : row) {
-				hash_count += cell->SampleCount();
-			}
+	for (const auto &row : cells) {
+		for (const auto &cell : row) {
+			hash_count += cell->SampleCount();
+		}
 	}
 	return hash_count * sizeof(uint64_t);
 }
@@ -171,6 +171,14 @@ void PointOmniSketch::AddNullValues(size_t count) {
 
 size_t PointOmniSketch::CountNulls() const {
 	return null_count;
+}
+
+void PointOmniSketch::SetRecordCount(size_t record_count_p) {
+	record_count = record_count_p;
+}
+
+void PointOmniSketch::SetCell(size_t row_idx, size_t col_idx, std::shared_ptr<OmniSketchCell> cell) {
+	cells[row_idx][col_idx] = cell;
 }
 
 } // namespace omnisketch

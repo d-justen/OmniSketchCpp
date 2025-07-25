@@ -78,6 +78,14 @@ public:
 		return max;
 	}
 
+	void SetMin(T &min_p) {
+		min = min_p;
+	}
+
+	void SetMax(T &max_p) {
+		max = max_p;
+	}
+
 	OmniSketchType Type() const override {
 		return OmniSketchType::PRE_JOINED;
 	}

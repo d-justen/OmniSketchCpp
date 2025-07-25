@@ -93,6 +93,10 @@ void CSVImporter::ImportTable(const std::string &path, const std::string &table_
 	table_stream.close();
 	for (size_t i = 1; i < column_names.size(); i++) {
 		Registry::Get().GetOmniSketch(table_name, column_names[i])->Flatten();
+		for (auto &referencing_tbl_name : referencing_table_names) {
+			Registry::Get().FindReferencingOmniSketch(table_name, column_names[i], referencing_tbl_name)->Flatten();
+		}
+		// TODO: What about referencing OmniSketches??
 	}
 }
 

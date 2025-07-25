@@ -94,3 +94,5 @@ endif()
 if(OMNISKETCH_ENABLE_TESTS)
     add_subdirectory(test)
 endif()
+
+add_subdirectory(bin)

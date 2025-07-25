@@ -95,6 +95,8 @@ public:
 	explicit MinHashSketchVector(size_t max_count_p) : max_count(max_count_p) {
 		data.reserve(max_count);
 	}
+	MinHashSketchVector(std::vector<uint64_t> data_p, size_t max_count_p) : data(std::move(data_p)), max_count(max_count_p) {
+	}
 
 	void AddRecord(uint64_t hash) override;
 	void EraseRecord(uint64_t hash) override;

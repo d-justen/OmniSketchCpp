@@ -1,7 +1,10 @@
 #pragma once
 
+#include <dirent.h>
+#include <fstream>
 #include <variant>
 
+#include "json/json.hpp"
 #include "omni_sketch/standard_omni_sketch.hpp"
 #include "omni_sketch/foreign_sorted_omni_sketch.hpp"
 #include "omni_sketch/pre_joined_omni_sketch.hpp"
@@ -138,9 +141,241 @@ public:
 		return result;
 	}
 
+	static void Serialize(const std::string &table_name, const std::string &column_name,
+	                      const std::string &referencing_table_name, const std::string &path) {
+		auto &registry = Registry::Get();
+		nlohmann::json json_obj;
+
+		std::shared_ptr<PointOmniSketch> sketch;
+		if (referencing_table_name.empty()) {
+			sketch = registry.GetOmniSketch(table_name, column_name);
+			json_obj["type"] = "standard";
+		} else {
+			sketch = registry.FindReferencingOmniSketch(table_name, column_name, referencing_table_name);
+			json_obj["type"] = "prejoined";
+		}
+
+		json_obj["table_name"] = table_name;
+		json_obj["column_name"] = column_name;
+		json_obj["width"] = sketch->Width();
+		json_obj["depth"] = sketch->Depth();
+		json_obj["min_hash_sketch_size"] = sketch->MinHashSketchSize();
+		json_obj["record_count"] = sketch->RecordCount();
+
+		nlohmann::json rows;
+		for (size_t i = 0; i < sketch->Depth(); i++) {
+			nlohmann::json row_obj;
+			for (size_t j = 0; j < sketch->Width(); j++) {
+				auto &cell = sketch->GetCell(i, j);
+				nlohmann::json cell_obj;
+				cell_obj["record_count"] = cell.RecordCount();
+				cell_obj["max_sample_count"] = cell.MaxSampleCount();
+				nlohmann::json mhs_obj;
+				for (auto it = cell.GetMinHashSketch()->Iterator(); !it->IsAtEnd(); it->Next()) {
+					mhs_obj.push_back(it->Current());
+				}
+				cell_obj["hashes"] = mhs_obj;
+				row_obj.emplace_back(cell_obj);
+			}
+			rows.push_back(row_obj);
+		}
+		json_obj["rows"] = rows;
+
+		if (std::dynamic_pointer_cast<TypedPointOmniSketch<size_t>>(sketch)) {
+			json_obj["data_type"] = "uint";
+			json_obj["min"] = std::dynamic_pointer_cast<TypedPointOmniSketch<size_t>>(sketch)->GetMin();
+			json_obj["max"] = std::dynamic_pointer_cast<TypedPointOmniSketch<size_t>>(sketch)->GetMax();
+		}
+		if (std::dynamic_pointer_cast<TypedPointOmniSketch<double>>(sketch)) {
+			json_obj["data_type"] = "double";
+			json_obj["min"] = std::dynamic_pointer_cast<TypedPointOmniSketch<double>>(sketch)->GetMin();
+			json_obj["max"] = std::dynamic_pointer_cast<TypedPointOmniSketch<double>>(sketch)->GetMax();
+		}
+		if (std::dynamic_pointer_cast<TypedPointOmniSketch<int32_t>>(sketch)) {
+			json_obj["data_type"] = "int";
+			json_obj["min"] = std::dynamic_pointer_cast<TypedPointOmniSketch<int32_t>>(sketch)->GetMin();
+			json_obj["max"] = std::dynamic_pointer_cast<TypedPointOmniSketch<int32_t>>(sketch)->GetMax();
+		}
+		if (std::dynamic_pointer_cast<TypedPointOmniSketch<std::string>>(sketch)) {
+			json_obj["data_type"] = "varchar";
+			json_obj["min"] = std::dynamic_pointer_cast<TypedPointOmniSketch<std::string>>(sketch)->GetMin();
+			json_obj["max"] = std::dynamic_pointer_cast<TypedPointOmniSketch<std::string>>(sketch)->GetMax();
+		}
+		if (std::dynamic_pointer_cast<PreJoinedOmniSketch<size_t>>(sketch)) {
+			json_obj["data_type"] = "uint";
+			json_obj["min"] = std::dynamic_pointer_cast<PreJoinedOmniSketch<size_t>>(sketch)->GetMin();
+			json_obj["max"] = std::dynamic_pointer_cast<PreJoinedOmniSketch<size_t>>(sketch)->GetMax();
+			json_obj["referencing_table_name"] = referencing_table_name;
+		}
+		if (std::dynamic_pointer_cast<PreJoinedOmniSketch<double>>(sketch)) {
+			json_obj["data_type"] = "double";
+			json_obj["min"] = std::dynamic_pointer_cast<PreJoinedOmniSketch<double>>(sketch)->GetMin();
+			json_obj["max"] = std::dynamic_pointer_cast<PreJoinedOmniSketch<double>>(sketch)->GetMax();
+			json_obj["referencing_table_name"] = referencing_table_name;
+		}
+		if (std::dynamic_pointer_cast<PreJoinedOmniSketch<int32_t>>(sketch)) {
+			json_obj["data_type"] = "int";
+			json_obj["min"] = std::dynamic_pointer_cast<PreJoinedOmniSketch<int32_t>>(sketch)->GetMin();
+			json_obj["max"] = std::dynamic_pointer_cast<PreJoinedOmniSketch<int32_t>>(sketch)->GetMax();
+			json_obj["referencing_table_name"] = referencing_table_name;
+		}
+		if (std::dynamic_pointer_cast<PreJoinedOmniSketch<std::string>>(sketch)) {
+			json_obj["data_type"] = "varchar";
+			json_obj["min"] = std::dynamic_pointer_cast<PreJoinedOmniSketch<std::string>>(sketch)->GetMin();
+			json_obj["max"] = std::dynamic_pointer_cast<PreJoinedOmniSketch<std::string>>(sketch)->GetMax();
+			json_obj["referencing_table_name"] = referencing_table_name;
+		}
+		std::ofstream file;
+		file.open(path);
+		file << json_obj;
+		file.close();
+	}
+
+	void Deserialize(const std::string &path) {
+		nlohmann::json json_obj;
+		std::ifstream file;
+		file.open(path);
+		file >> json_obj;
+		file.close();
+
+		std::shared_ptr<PointOmniSketch> sketch;
+		if (json_obj["type"] == "standard") {
+			if (json_obj["data_type"] == "uint") {
+				auto typed_sketch = std::make_shared<TypedPointOmniSketch<size_t>>(json_obj["width"], json_obj["depth"],
+				                                                                   json_obj["min_hash_sketch_size"]);
+				size_t max = json_obj["max"];
+				typed_sketch->SetMax(max);
+				size_t min = json_obj["min"];
+				typed_sketch->SetMin(min);
+				sketch = typed_sketch;
+				sketches[json_obj["table_name"]][json_obj["column_name"]].main_sketch = typed_sketch;
+			} else if (json_obj["data_type"] == "int") {
+				auto typed_sketch = std::make_shared<TypedPointOmniSketch<int32_t>>(
+				    json_obj["width"], json_obj["depth"], json_obj["min_hash_sketch_size"]);
+				int32_t max = json_obj["max"];
+				typed_sketch->SetMax(max);
+				int32_t min = json_obj["min"];
+				typed_sketch->SetMin(min);
+				sketch = typed_sketch;
+				sketches[json_obj["table_name"]][json_obj["column_name"]].main_sketch = typed_sketch;
+			} else if (json_obj["data_type"] == "double") {
+				auto typed_sketch = std::make_shared<TypedPointOmniSketch<double>>(json_obj["width"], json_obj["depth"],
+				                                                                   json_obj["min_hash_sketch_size"]);
+				double max = json_obj["max"];
+				typed_sketch->SetMax(max);
+				double min = json_obj["min"];
+				typed_sketch->SetMin(min);
+				sketch = typed_sketch;
+				sketches[json_obj["table_name"]][json_obj["column_name"]].main_sketch = typed_sketch;
+			} else if (json_obj["data_type"] == "varchar") {
+				auto typed_sketch = std::make_shared<TypedPointOmniSketch<std::string>>(
+				    json_obj["width"], json_obj["depth"], json_obj["min_hash_sketch_size"]);
+				std::string max = json_obj["max"];
+				typed_sketch->SetMax(max);
+				std::string min = json_obj["min"];
+				typed_sketch->SetMin(min);
+				sketch = typed_sketch;
+				sketches[json_obj["table_name"]][json_obj["column_name"]].main_sketch = typed_sketch;
+			}
+		} else {
+			assert(json_obj["type"] == "prejoined");
+			if (json_obj["data_type"] == "uint") {
+				auto typed_sketch = std::make_shared<PreJoinedOmniSketch<size_t>>(
+				    nullptr, json_obj["width"], json_obj["depth"], json_obj["min_hash_sketch_size"]);
+				size_t max = json_obj["max"];
+				typed_sketch->SetMax(max);
+				size_t min = json_obj["min"];
+				typed_sketch->SetMin(min);
+				sketch = typed_sketch;
+				sketches[json_obj["table_name"]][json_obj["column_name"]]
+				    .referencing_sketches[json_obj["referencing_table_name"]] = typed_sketch;
+			} else if (json_obj["data_type"] == "int") {
+				auto typed_sketch = std::make_shared<PreJoinedOmniSketch<int32_t>>(
+				    nullptr, json_obj["width"], json_obj["depth"], json_obj["min_hash_sketch_size"]);
+				int32_t max = json_obj["max"];
+				typed_sketch->SetMax(max);
+				int32_t min = json_obj["min"];
+				typed_sketch->SetMin(min);
+				sketch = typed_sketch;
+				sketches[json_obj["table_name"]][json_obj["column_name"]]
+				    .referencing_sketches[json_obj["referencing_table_name"]] = typed_sketch;
+			} else if (json_obj["data_type"] == "double") {
+				auto typed_sketch = std::make_shared<PreJoinedOmniSketch<double>>(
+				    nullptr, json_obj["width"], json_obj["depth"], json_obj["min_hash_sketch_size"]);
+				double max = json_obj["max"];
+				typed_sketch->SetMax(max);
+				double min = json_obj["min"];
+				typed_sketch->SetMin(min);
+				sketch = typed_sketch;
+				sketches[json_obj["table_name"]][json_obj["column_name"]]
+				    .referencing_sketches[json_obj["referencing_table_name"]] = typed_sketch;
+			} else if (json_obj["data_type"] == "varchar") {
+				auto typed_sketch = std::make_shared<PreJoinedOmniSketch<std::string>>(
+				    nullptr, json_obj["width"], json_obj["depth"], json_obj["min_hash_sketch_size"]);
+				std::string max = json_obj["max"];
+				typed_sketch->SetMax(max);
+				std::string min = json_obj["min"];
+				typed_sketch->SetMin(min);
+				sketch = typed_sketch;
+				sketches[json_obj["table_name"]][json_obj["column_name"]]
+				    .referencing_sketches[json_obj["referencing_table_name"]] = typed_sketch;
+			}
+		}
+
+		sketch->SetRecordCount(json_obj["record_count"]);
+		for (size_t i = 0; i < sketch->Depth(); i++) {
+			auto &row = json_obj["rows"][i];
+			for (size_t j = 0; j < sketch->Width(); j++) {
+				auto &cell_json = row[j];
+				std::vector<uint64_t> hashes = cell_json["hashes"];
+				auto mhs = std::make_shared<MinHashSketchVector>(hashes, cell_json["max_sample_count"]);
+				sketch->SetCell(i, j, std::make_shared<OmniSketchCell>(mhs, cell_json["record_count"]));
+			}
+		}
+	}
+
+	void SetSketchDirectory(const std::string &path) {
+		std::vector<std::string> json_files;
+		DIR *dir = opendir(path.c_str());
+
+		if (dir == nullptr) {
+			std::cerr << "Could not open directory: " << path << std::endl;
+			return;
+		}
+
+		sketches.clear();
+
+		struct dirent *entry;
+		while ((entry = readdir(dir)) != nullptr) {
+			if (entry->d_type == DT_REG || entry->d_type == DT_UNKNOWN) {
+				std::string filename(entry->d_name);
+				if (hasJsonExtension(filename)) {
+					std::string fullPath = path;
+					if (fullPath.back() != '/') {
+						fullPath += '/';
+					}
+					fullPath += filename;
+					json_files.push_back(fullPath);
+				}
+			}
+		}
+
+		for (auto &json_file : json_files) {
+			Deserialize(json_file);
+		}
+	}
+
 private:
 	Registry();
 	std::unordered_map<std::string, TableEntry> sketches;
+
+	bool hasJsonExtension(const std::string &filename) {
+		const std::string extension = ".json";
+		if (filename.length() >= extension.length()) {
+			return (0 == filename.compare(filename.length() - extension.length(), extension.length(), extension));
+		}
+		return false;
+	}
 };
 
 } // namespace omnisketch
