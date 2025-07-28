@@ -18,10 +18,11 @@ class OmniSketch {
 public:
 	virtual ~OmniSketch() = default;
 	virtual size_t RecordCount() const = 0;
-	virtual std::shared_ptr<OmniSketchCell> ProbeHash(uint64_t hash,
-	                                                  std::vector<std::shared_ptr<OmniSketchCell>> &matches) const = 0;
+	virtual std::shared_ptr<OmniSketchCell>
+	ProbeHash(uint64_t hash, std::vector<std::shared_ptr<OmniSketchCell>> &matches, size_t max_samples = 0) const = 0;
 	virtual std::shared_ptr<OmniSketchCell> ProbeHashedSet(const std::shared_ptr<MinHashSketch> &values) const = 0;
 	virtual std::shared_ptr<OmniSketchCell> ProbeHashedSet(const std::shared_ptr<OmniSketchCell> &values) const = 0;
+	virtual double EstimateAverageMatchesPerProbe() const = 0;
 	virtual void AddValueRecord(const Value &value, uint64_t record_id) = 0;
 	virtual void AddRecordHashed(uint64_t value_hash, uint64_t record_id_hash) = 0;
 	virtual void AddNullValues(size_t count) = 0;
@@ -56,8 +57,8 @@ public:
 	size_t RecordCount() const override;
 	void SetRecordCount(size_t record_count_p);
 	std::shared_ptr<OmniSketchCell> ProbeValue(const Value &value) const override;
-	std::shared_ptr<OmniSketchCell> ProbeHash(uint64_t hash,
-	                                          std::vector<std::shared_ptr<OmniSketchCell>> &matches) const override;
+	std::shared_ptr<OmniSketchCell> ProbeHash(uint64_t hash, std::vector<std::shared_ptr<OmniSketchCell>> &matches,
+	                                          size_t max_samples = 0) const override;
 	std::shared_ptr<OmniSketchCell> ProbeHashedSet(const std::shared_ptr<MinHashSketch> &values) const override;
 	std::shared_ptr<OmniSketchCell> ProbeHashedSet(const std::shared_ptr<OmniSketchCell> &values) const override;
 	std::shared_ptr<OmniSketchCell> ProbeValueSet(const ValueSet &values) const override;

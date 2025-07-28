@@ -54,6 +54,16 @@ public:
 		return PointOmniSketch::ProbeHashedSet(std::make_shared<MinHashSketchVector>(hashes));
 	}
 
+	double EstimateAverageMatchesPerProbe() const override {
+		size_t filled_cells_front_row = 0;
+		for (auto &cell : cells.front()) {
+			if (cell->RecordCount() > 0) {
+				filled_cells_front_row++;
+			}
+		}
+		return (double)record_count / (double)filled_cells_front_row;
+	}
+
 	T GetMin() const {
 		return min;
 	}
@@ -79,5 +89,11 @@ protected:
 	T min = std::numeric_limits<T>::max();
 	T max = std::numeric_limits<T>::min();
 };
+
+template <>
+inline double TypedPointOmniSketch<size_t>::EstimateAverageMatchesPerProbe() const {
+	size_t domain = max - min;
+	return (double)record_count / (double)domain;
+}
 
 } // namespace omnisketch

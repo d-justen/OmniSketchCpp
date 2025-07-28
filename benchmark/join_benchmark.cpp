@@ -154,7 +154,6 @@ public:
 
 		auto benchmark_name = static_cast<BenchmarkName>(BENCH_ID);
 		auto combinator_type = static_cast<CombinatorType>(COMBINATOR_ID);
-		std::shared_ptr<OmniSketchCombinator> c;
 
 		bool use_ref_sketches = combinator_type == CombinatorType::EXHAUSTIVE_CORRELATED;
 

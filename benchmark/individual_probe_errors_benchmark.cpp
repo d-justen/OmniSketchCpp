@@ -112,7 +112,8 @@ public:
 			if (use_approximate_join) {
 				assert(false); // TODO: implement
 			} else {
-				auto combinator = std::make_shared<omnisketch::ExhaustiveCombinator>();
+				auto combinator =
+				    std::make_shared<omnisketch::CombinedPredicateEstimator>(omni_sketch->MinHashSketchSize());
 				combinator->AddPredicate(omni_sketch, probe_sample);
 				const auto card = combinator->ComputeResult(omni_sketch->MinHashSketchSize());
 				SetCounters(state, ComputeQError(card->RecordCount(), actual_card));

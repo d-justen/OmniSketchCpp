@@ -1,6 +1,5 @@
 #include "min_hash_sketch/min_hash_sketch_set.hpp"
 
-#include "min_hash_sketch/intersect_min_hash_sketches.hpp"
 #include "min_hash_sketch/min_hash_sketch_vector.hpp"
 
 namespace omnisketch {
@@ -63,7 +62,7 @@ std::shared_ptr<MinHashSketch> MinHashSketchSet::Flatten() const {
 
 std::shared_ptr<MinHashSketch> MinHashSketchSet::Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches,
                                                            size_t max_sample_count) {
-	return ComputeIntersection<MinHashSketchSet, std::set<uint64_t>>(sketches, nullptr, max_sample_count);
+	return MinHashSketchVector::ComputeIntersection(sketches, nullptr, max_sample_count);
 }
 
 std::shared_ptr<MinHashSketch>

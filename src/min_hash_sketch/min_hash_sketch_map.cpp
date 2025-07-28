@@ -1,6 +1,5 @@
 #include "min_hash_sketch/min_hash_sketch_map.hpp"
 
-#include "min_hash_sketch/intersect_min_hash_sketches.hpp"
 #include "min_hash_sketch/min_hash_sketch_vector.hpp"
 
 namespace omnisketch {
@@ -52,7 +51,7 @@ std::shared_ptr<MinHashSketch> MinHashSketchMap::Flatten() const {
 
 std::shared_ptr<MinHashSketch> MinHashSketchMap::Intersect(const std::vector<std::shared_ptr<MinHashSketch>> &sketches,
                                                            size_t max_sample_count) {
-	return ComputeIntersection<MinHashSketchMap, std::set<uint64_t>>(sketches, nullptr, max_sample_count);
+	return MinHashSketchVector::ComputeIntersection(sketches, nullptr, max_sample_count);
 }
 
 void MinHashSketchMap::Combine(const MinHashSketch &other) {
@@ -97,8 +96,7 @@ std::unique_ptr<MinHashSketch::SketchIterator> MinHashSketchMap::Iterator() cons
 }
 
 std::unique_ptr<MinHashSketch::SketchIterator> MinHashSketchMap::Iterator(size_t max_sample_count) const {
-	return std::make_unique<MinHashSketchMap::SketchIterator>(data.cbegin(),
-	                                                          std::min(data.size(), max_sample_count));
+	return std::make_unique<MinHashSketchMap::SketchIterator>(data.cbegin(), std::min(data.size(), max_sample_count));
 }
 
 std::map<uint64_t, uint64_t> &MinHashSketchMap::Data() {
@@ -115,21 +113,14 @@ void MinHashSketchMap::EraseRecord(uint64_t hash) {
 
 std::shared_ptr<MinHashSketchMap> MinHashSketchMap::IntersectMap(std::vector<std::shared_ptr<MinHashSketch>> &sketches,
                                                                  size_t n_max, size_t max_sample_size) {
-	if (max_sample_size == 0) {
-		max_sample_size = UINT64_MAX;
-		for (const auto &sketch : sketches) {
-			max_sample_size = std::min(max_sample_size, sketch->MaxCount());
-		}
-	}
-
 	std::vector<std::unique_ptr<MinHashSketch::SketchIterator>> offsets;
 	offsets.reserve(sketches.size());
 
 	for (const auto &sketch : sketches) {
-		offsets.push_back(sketch->Iterator(max_sample_size));
+		offsets.push_back(sketch->Iterator());
 	}
 
-	auto result = std::make_shared<MinHashSketchMap>(max_sample_size);
+	auto result = std::make_shared<MinHashSketchMap>(UINT64_MAX);
 	auto &result_data = result->Data();
 
 	while (!offsets[0]->IsAtEnd()) {
@@ -164,7 +155,7 @@ std::shared_ptr<MinHashSketchMap> MinHashSketchMap::IntersectMap(std::vector<std
 			break;
 		}
 		if (found_match) {
-			result_data[current_hash] = static_cast<uint64_t>((double) current_n_max /(double ) max_sample_size);
+			result_data[current_hash] = static_cast<uint64_t>((double)current_n_max / (double)max_sample_size);
 			offsets[0]->Next();
 		}
 	}

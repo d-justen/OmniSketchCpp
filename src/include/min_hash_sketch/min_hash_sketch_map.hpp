@@ -8,8 +8,7 @@ class MinHashSketchMap : public MinHashSketch {
 public:
 	class SketchIterator : public MinHashSketch::SketchIterator {
 	public:
-		SketchIterator(std::map<uint64_t, uint64_t>::const_iterator map_it_p,
-		               size_t value_count_p)
+		SketchIterator(std::map<uint64_t, uint64_t>::const_iterator map_it_p, size_t value_count_p)
 		    : map_it(map_it_p), offset(0), value_count(value_count_p) {
 		}
 		void Next() override {
@@ -70,7 +69,9 @@ public:
 		max_count = data.size();
 	}
 
-	static std::shared_ptr<MinHashSketchMap> IntersectMap(std::vector<std::shared_ptr<MinHashSketch>> &sketches, size_t n_max, size_t max_sample_size = 0);
+	static std::shared_ptr<MinHashSketchMap> IntersectMap(std::vector<std::shared_ptr<MinHashSketch>> &sketches,
+	                                                      size_t n_max, size_t max_sample_size = 0);
+
 private:
 	std::map<uint64_t, uint64_t> data;
 	size_t max_count;

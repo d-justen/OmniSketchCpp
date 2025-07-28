@@ -97,7 +97,7 @@ BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, ConjunctPointQueries, WIDTH, DEPT
 
 	std::shared_ptr<omnisketch::OmniSketchCell> card;
 	for (auto _ : state) {
-		auto combinator = std::make_shared<omnisketch::ExhaustiveCombinator>();
+		auto combinator = std::make_shared<omnisketch::CombinedPredicateEstimator>(omni_sketch->MinHashSketchSize());
 		combinator->AddPredicate(omni_sketch, omnisketch::PredicateConverter::ConvertPoint(17));
 		combinator->AddPredicate(omni_sketch_2, omnisketch::PredicateConverter::ConvertPoint(17));
 		combinator->AddPredicate(omni_sketch_3, omnisketch::PredicateConverter::ConvertPoint(17));
@@ -124,7 +124,7 @@ BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, ConjunctPointQueriesFlattened, WI
 
 	std::shared_ptr<omnisketch::OmniSketchCell> card;
 	for (auto _ : state) {
-		auto combinator = std::make_shared<omnisketch::ExhaustiveCombinator>();
+		auto combinator = std::make_shared<omnisketch::CombinedPredicateEstimator>(omni_sketch->MinHashSketchSize());
 		combinator->AddPredicate(omni_sketch, omnisketch::PredicateConverter::ConvertPoint(17));
 		combinator->AddPredicate(omni_sketch_2, omnisketch::PredicateConverter::ConvertPoint(17));
 		combinator->AddPredicate(omni_sketch_3, omnisketch::PredicateConverter::ConvertPoint(17));
@@ -145,7 +145,7 @@ BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, DisjunctPointQueries, WIDTH, DEPT
 
 	std::shared_ptr<omnisketch::OmniSketchCell> card;
 	for (auto _ : state) {
-		auto combinator = std::make_shared<omnisketch::ExhaustiveCombinator>();
+		auto combinator = std::make_shared<omnisketch::CombinedPredicateEstimator>(omni_sketch->MinHashSketchSize());
 		combinator->AddPredicate(omni_sketch, omnisketch::PredicateConverter::ConvertSet(values));
 		card = combinator->ComputeResult(omni_sketch->MinHashSketchSize());
 	}
@@ -166,7 +166,7 @@ BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, DisjunctPointQueriesFlattened, WI
 
 	std::shared_ptr<omnisketch::OmniSketchCell> card;
 	for (auto _ : state) {
-		auto combinator = std::make_shared<omnisketch::ExhaustiveCombinator>();
+		auto combinator = std::make_shared<omnisketch::CombinedPredicateEstimator>(omni_sketch->MinHashSketchSize());
 		combinator->AddPredicate(omni_sketch, omnisketch::PredicateConverter::ConvertSet(values));
 		card = combinator->ComputeResult(omni_sketch->MinHashSketchSize());
 	}
@@ -185,7 +185,7 @@ BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, SetMembership, WIDTH, DEPTH, SAMP
 
 	std::shared_ptr<omnisketch::OmniSketchCell> card;
 	for (auto _ : state) {
-		auto combinator = std::make_shared<omnisketch::ExhaustiveCombinator>();
+		auto combinator = std::make_shared<omnisketch::CombinedPredicateEstimator>(omni_sketch->MinHashSketchSize());
 		combinator->AddPredicate(omni_sketch, omnisketch::PredicateConverter::ConvertSet(values));
 		card = combinator->ComputeResult(omni_sketch->MinHashSketchSize());
 	}
@@ -206,7 +206,7 @@ BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, SetMembershipFlattened, WIDTH, DE
 
 	std::shared_ptr<omnisketch::OmniSketchCell> card;
 	for (auto _ : state) {
-		auto combinator = std::make_shared<omnisketch::ExhaustiveCombinator>();
+		auto combinator = std::make_shared<omnisketch::CombinedPredicateEstimator>(omni_sketch->MinHashSketchSize());
 		combinator->AddPredicate(omni_sketch, omnisketch::PredicateConverter::ConvertSet(values));
 		card = combinator->ComputeResult(omni_sketch->MinHashSketchSize());
 	}

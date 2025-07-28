@@ -119,6 +119,10 @@ public:
 	std::vector<uint64_t> &Data();
 	const std::vector<uint64_t> &Data() const;
 
+	static std::shared_ptr<MinHashSketch>
+	ComputeIntersection(const std::vector<std::shared_ptr<MinHashSketch>> &sketches, ValidityMask *mask = nullptr,
+	                    size_t max_sample_size = 0);
+
 private:
 	void ShrinkToFit();
 

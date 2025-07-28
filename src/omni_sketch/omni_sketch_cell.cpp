@@ -68,7 +68,7 @@ size_t OmniSketchCell::EstimateByteSize() const {
 	return sizeof(size_t) + sizeof(std::shared_ptr<MinHashSketch>);
 }
 
-std::shared_ptr<OmniSketchCell> OmniSketchCell::Intersect(const std::vector<std::shared_ptr<OmniSketchCell>> &cells) {
+std::shared_ptr<OmniSketchCell> OmniSketchCell::Intersect(const std::vector<std::shared_ptr<OmniSketchCell>> &cells, size_t max_samples) {
 	assert(!cells.empty());
 	// TODO(perf): re-use vectors or operate on min-hash sketches directly
 	std::vector<std::shared_ptr<MinHashSketch>> sketches;
@@ -87,7 +87,7 @@ std::shared_ptr<OmniSketchCell> OmniSketchCell::Intersect(const std::vector<std:
 		sketches.push_back(cell->GetMinHashSketch());
 	}
 
-	auto result = std::make_shared<OmniSketchCell>(sketches.front()->Intersect(sketches));
+	auto result = std::make_shared<OmniSketchCell>(sketches.front()->Intersect(sketches, max_samples));
 	const double card_est =
 	    std::min((double)n_min, (double)n_max / (double)sample_count * (double)result->SampleCount());
 	result->SetRecordCount((size_t)std::round(card_est));

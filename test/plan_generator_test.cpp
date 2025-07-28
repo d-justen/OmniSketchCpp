@@ -33,11 +33,11 @@ TEST(PlanGeneratorTest, StarShape) {
 	gen.AddJoin("fact", "fk_t", "dim_t");
 	const double result = gen.EstimateCardinality();
 
-	auto combinator_s = std::make_shared<omnisketch::ExhaustiveCombinator>();
+	auto combinator_s = std::make_shared<omnisketch::CombinedPredicateEstimator>(dim_s_att->MinHashSketchSize());
 	combinator_s->AddPredicate(dim_s_att, omnisketch::PredicateConverter::ConvertRange(0, 249));
-	auto combinator_t = std::make_shared<omnisketch::ExhaustiveCombinator>();
+	auto combinator_t = std::make_shared<omnisketch::CombinedPredicateEstimator>(dim_t_att->MinHashSketchSize());
 	combinator_t->AddPredicate(dim_t_att, omnisketch::PredicateConverter::ConvertRange(0, 124));
-	auto combinator_fact = std::make_shared<omnisketch::ExhaustiveCombinator>();
+	auto combinator_fact = std::make_shared<omnisketch::CombinedPredicateEstimator>(fact_fk_s->MinHashSketchSize());
 	combinator_fact->AddPredicate(fact_fk_s, combinator_s->ComputeResult(UINT64_MAX));
 	combinator_fact->AddPredicate(fact_fk_t, combinator_t->ComputeResult(UINT64_MAX));
 	auto result_2 = combinator_fact->ComputeResult(UINT64_MAX);

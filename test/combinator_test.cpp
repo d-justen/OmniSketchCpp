@@ -3,9 +3,7 @@
 #include "combinator_test.hpp"
 #include <random>
 
-using ExhaustiveCombinator = CombinatorTestFixture<omnisketch::ExhaustiveCombinator>;
-
-TEST_F(ExhaustiveCombinator, SingleJoinNoSampling) {
+TEST_F(CombinatorTestFixture, SingleJoinNoSampling) {
 	combinator->AddPredicate(sketch_1, probe_result_1);
 	auto result = combinator->ComputeResult(SAMPLE_COUNT);
 	EXPECT_EQ(result->RecordCount(), 20);
@@ -13,7 +11,7 @@ TEST_F(ExhaustiveCombinator, SingleJoinNoSampling) {
 	EXPECT_EQ(result->MaxSampleCount(), SAMPLE_COUNT);
 }
 
-TEST_F(ExhaustiveCombinator, SingleJoinWithSampling) {
+TEST_F(CombinatorTestFixture, SingleJoinWithSampling) {
 	combinator->AddPredicate(sketch_3, probe_result_3);
 	auto result = combinator->ComputeResult(SAMPLE_COUNT);
 	EXPECT_EQ(result->RecordCount(), 32);
@@ -21,7 +19,7 @@ TEST_F(ExhaustiveCombinator, SingleJoinWithSampling) {
 	EXPECT_EQ(result->MaxSampleCount(), SAMPLE_COUNT);
 }
 
-TEST_F(ExhaustiveCombinator, MultiJoin) {
+TEST_F(CombinatorTestFixture, MultiJoin) {
 	combinator->AddPredicate(sketch_1, probe_result_1);
 	combinator->AddPredicate(sketch_2, probe_result_2);
 	combinator->AddPredicate(sketch_3, probe_result_3);
@@ -32,7 +30,7 @@ TEST_F(ExhaustiveCombinator, MultiJoin) {
 	EXPECT_EQ(result->MaxSampleCount(), SAMPLE_COUNT);
 }
 
-TEST_F(ExhaustiveCombinator, JoinCorrelation) {
+TEST_F(CombinatorTestFixture, JoinCorrelation) {
 	const size_t RECORD_COUNT = 10000;
 	const size_t DOMAIN_1 = 200;
 	const double SEL_1 = 0.5;
@@ -64,14 +62,14 @@ TEST_F(ExhaustiveCombinator, JoinCorrelation) {
 		auto set_2 = omnisketch::PredicateConverter::ConvertRange((size_t)1, probe_size_2);
 		set_2->SetRecordCount(DOMAIN_2 * SEL_2);
 
-		auto comb = std::make_shared<omnisketch::ExhaustiveCombinator>();
+		auto comb = std::make_shared<omnisketch::CombinedPredicateEstimator>(32);
 		comb->AddPredicate(omni_1, set_1);
 		comb->AddPredicate(omni_2, set_2);
 		comb->ComputeResult(SAMPLE_COUNT);
 	}
 }
 
-TEST_F(ExhaustiveCombinator, FilterProbeSet) {
+TEST_F(CombinatorTestFixture, FilterProbeSet) {
 	const size_t FK_SIDE_CARD = 1000;
 	const size_t FK_SIDE_ATTRIBUTE_DOMAIN = 100;
 	const size_t PK_SIDE_CARD = 200;

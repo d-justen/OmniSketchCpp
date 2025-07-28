@@ -1,5 +1,6 @@
 #pragma once
 
+#include "min_hash_sketch/min_hash_sketch_map.hpp"
 #include "omni_sketch/omni_sketch.hpp"
 #include "util/value.hpp"
 
@@ -35,58 +36,37 @@ public:
 	}
 };
 
-class OmniSketchCombinator {
-public:
-	virtual ~OmniSketchCombinator() = default;
-	virtual void AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,
-	                          std::shared_ptr<OmniSketchCell> probe_sample) = 0;
-	virtual void Finalize() = 0;
-	virtual void AddUnfilteredRids(std::shared_ptr<OmniSketch> omni_sketch) = 0;
-	virtual void AddUnfilteredRids(std::shared_ptr<OmniSketchCell> rid_sample) = 0;
-	virtual bool HasPredicates() const = 0;
-	virtual std::shared_ptr<OmniSketchCell> ComputeResult(size_t max_output_size) const = 0;
-	virtual std::shared_ptr<OmniSketchCell> FilterProbeSet(std::shared_ptr<OmniSketch> omni_sketch,
-	                                                       std::shared_ptr<OmniSketchCell> probe_sample) const = 0;
-};
-
-struct ExhaustiveCombinatorItem {
-	ExhaustiveCombinatorItem(std::shared_ptr<OmniSketchCell> cell_p, size_t n_max_p)
-	    : cell(std::move(cell_p)), n_max(n_max_p) {
+struct PredicateResult {
+	double GetSel() const {
+		return selectivity == 0 ? fallback_selectivity : selectivity;
 	}
 
-	std::shared_ptr<OmniSketchCell> cell;
+	std::shared_ptr<MinHashSketch> sketch;
+	double selectivity;
+	double fallback_selectivity;
+	double sampling_probability;
+	bool is_set_membership;
 	size_t n_max;
-
-	static size_t GetNMax(const std::vector<std::shared_ptr<OmniSketchCell>> &cells) {
-		size_t n_max = 0;
-		for (const auto &cell : cells) {
-			n_max = std::max(n_max, cell->RecordCount());
-		}
-		return n_max;
-	}
 };
 
-class ExhaustiveCombinator : public OmniSketchCombinator {
+class CombinedPredicateEstimator {
 public:
-	void AddPredicate(std::shared_ptr<OmniSketch> omni_sketch, std::shared_ptr<OmniSketchCell> probe_sample) override;
-	void AddUnfilteredRids(std::shared_ptr<OmniSketch> omni_sketch) override;
-	void AddUnfilteredRids(std::shared_ptr<OmniSketchCell> rid_sample) override;
-	bool HasPredicates() const override;
-	std::shared_ptr<OmniSketchCell> ComputeResult(size_t max_output_size) const override;
-	std::shared_ptr<OmniSketchCell> FilterProbeSet(std::shared_ptr<OmniSketch> omni_sketch,
-	                                               std::shared_ptr<OmniSketchCell> probe_sample) const override;
-	void Finalize() override;
+	explicit CombinedPredicateEstimator(size_t max_sample_count_p) : max_sample_count(max_sample_count_p) {
+	}
+	void AddPredicate(const std::shared_ptr<OmniSketch> &omni_sketch,
+	                  const std::shared_ptr<OmniSketchCell> &probe_sample);
+	void AddUnfilteredRids(const std::shared_ptr<OmniSketch> &omni_sketch);
+	void AddUnfilteredRids(const std::shared_ptr<OmniSketchCell> &probe_sample, size_t base_card_p);
+	bool HasPredicates() const;
+	std::shared_ptr<OmniSketchCell> ComputeResult(size_t max_output_size) const;
+	std::shared_ptr<OmniSketchCell> FilterProbeSet(const std::shared_ptr<OmniSketch> &omni_sketch,
+	                                               const std::shared_ptr<OmniSketchCell> &probe_sample) const;
+	void Finalize();
 
 protected:
-	std::vector<std::vector<ExhaustiveCombinatorItem>> join_key_matches;
-	std::vector<double> sampling_probabilities;
-	std::vector<double> join_sels;
+	std::vector<PredicateResult> intermediate_results;
 	size_t max_sample_count;
-	size_t base_card;
-
-protected:
-	void FindMatchesInNextJoin(const std::shared_ptr<MinHashSketch> &current, size_t join_idx, size_t current_n_max,
-	                           std::vector<double> &match_counts, std::shared_ptr<OmniSketchCell> &result) const;
+	size_t base_card = 0;
 };
 
 } // namespace omnisketch

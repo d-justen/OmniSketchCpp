@@ -1,5 +1,6 @@
 #include "omni_sketch/omni_sketch.hpp"
 
+#include "min_hash_sketch/min_hash_sketch_map.hpp"
 #include "omni_sketch/omni_sketch_cell.hpp"
 #include "util/hash.hpp"
 
@@ -43,7 +44,7 @@ std::shared_ptr<OmniSketchCell> PointOmniSketch::ProbeValue(const Value &value) 
 
 // TODO(perf): use raw pointers for matches -> no more shared_ptr count increment
 std::shared_ptr<OmniSketchCell>
-PointOmniSketch::ProbeHash(uint64_t hash, std::vector<std::shared_ptr<OmniSketchCell>> &matches) const {
+PointOmniSketch::ProbeHash(uint64_t hash, std::vector<std::shared_ptr<OmniSketchCell>> &matches, size_t max_samples) const {
 	assert(matches.size() == depth);
 	assert(width == hash_processor->Width());
 	hash_processor->SetHash(hash);
@@ -52,7 +53,7 @@ PointOmniSketch::ProbeHash(uint64_t hash, std::vector<std::shared_ptr<OmniSketch
 		matches[row_idx] = cells[row_idx][col_idx];
 	}
 
-	return OmniSketchCell::Intersect(matches);
+	return OmniSketchCell::Intersect(matches, max_samples);
 }
 
 std::shared_ptr<OmniSketchCell> PointOmniSketch::ProbeHashedSet(const std::shared_ptr<MinHashSketch> &values) const {
@@ -134,7 +135,15 @@ size_t PointOmniSketch::MinHashSketchSize() const {
 }
 
 std::shared_ptr<OmniSketchCell> PointOmniSketch::GetRids() const {
+	auto result_map = std::make_shared<MinHashSketchMap>(max_sample_count);
+	for (auto& cell : cells.front()) {
+		for (auto it = cell->GetMinHashSketch()->Iterator(); !it->IsAtEnd(); it->Next()) {
+			result_map->AddRecord(it->Current(), cell->RecordCount());
+		}
+	}
+
 	return OmniSketchCell::Combine(cells.front());
+
 }
 
 void PointOmniSketch::Combine(const std::shared_ptr<OmniSketch> &other) {

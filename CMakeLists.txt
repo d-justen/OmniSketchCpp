@@ -18,7 +18,6 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
 endif()
 
 set(SOURCE_FILES
-        src/include/min_hash_sketch/intersect_min_hash_sketches.hpp
         src/include/min_hash_sketch/min_hash_sketch.hpp
         src/include/min_hash_sketch/min_hash_sketch_map.hpp
         src/include/min_hash_sketch/min_hash_sketch_set.hpp

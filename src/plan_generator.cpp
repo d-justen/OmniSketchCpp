@@ -34,6 +34,19 @@ bool PlanGenerator::CheckIfResolvable(const std::shared_ptr<PlanExecItem> &item)
 	return not_resolvable_count <= 1;
 }
 
+size_t GetMaxSampleCount(const std::string &table_name, const PlanItem &item) {
+	auto &registry = Registry::Get();
+	if (item.predicates.empty()) {
+		return registry.GetMinHashSketchSize(table_name);
+	}
+	size_t max_sample_count = UINT64_MAX;
+	for (auto &predicate : item.predicates) {
+		auto sketch = registry.GetOmniSketch(table_name, predicate.first);
+		max_sample_count = std::min(max_sample_count, sketch->MinHashSketchSize());
+	}
+	return max_sample_count;
+}
+
 std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> PlanGenerator::CreateInitialExecutionPlan() const {
 	std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> exec_items;
 	for (auto &plan_item_pair : plan_items) {
@@ -41,7 +54,7 @@ std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> PlanGenerator::Cr
 		auto &plan_item = plan_item_pair.second;
 
 		auto exec_item = std::make_shared<PlanExecItem>();
-		exec_item->combinator = combinator_creator();
+		exec_item->estimator = std::make_shared<CombinedPredicateEstimator>(GetMaxSampleCount(table_name, *plan_item));
 		exec_item->probes_into = plan_item->probes_into;
 		exec_item->probed_from = plan_item->probed_from;
 		exec_items[table_name] = exec_item;
@@ -71,14 +84,15 @@ std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> PlanGenerator::Re
 				if (fk_side_sketch->CountNulls() > 0) {
 					// FK column has nulls -> Join has selectivity < 1 even without predicate on dimension table
 					// Create MinHashSketch from unfiltered foreign key OmniSketch
-					fk_side_exec_item->combinator->AddUnfilteredRids(fk_side_sketch);
+					fk_side_exec_item->estimator->AddUnfilteredRids(fk_side_sketch);
 				}
 
 				// Remove edge and do not add primary key side to result map
 				fk_side_exec_item->probed_from.erase(table_name);
 			} else {
 				// Primary key side is not filtered out and gets unfiltered record ids as a predicate
-				pk_side_exec_item->combinator->AddUnfilteredRids(registry.ProduceRidSample(table_name));
+				pk_side_exec_item->estimator->AddUnfilteredRids(registry.ProduceRidSample(table_name),
+				                                                registry.GetBaseTableCard(table_name));
 				after[table_name] = pk_side_exec_item;
 			}
 		} else {
@@ -113,14 +127,14 @@ PlanGenerator::AddPredicatesToPlan(const std::unordered_map<std::string, std::sh
 				    registry.FindReferencingOmniSketch(table_name, column_name, plan_item->probes_into.begin()->first);
 
 				if (referencing_sketch && use_referencing_sketches) {
-						// Coordinated sketch has rids of its join partner: we can treat it like a predicate on the FK
-						// side
-						fk_side_exec_item->combinator->AddPredicate(referencing_sketch, probe_values);
+					// Coordinated sketch has rids of its join partner: we can treat it like a predicate on the FK
+					// side
+					fk_side_exec_item->estimator->AddPredicate(referencing_sketch, probe_values);
 					fk_side_exec_item->probed_from.erase(table_name);
 					continue;
 				}
 			}
-			exec_item->combinator->AddPredicate(registry.GetOmniSketch(table_name, column_name), probe_values);
+			exec_item->estimator->AddPredicate(registry.GetOmniSketch(table_name, column_name), probe_values);
 			all_predicates_referenced = false;
 		}
 		if (!all_predicates_referenced || plan_item->predicates.empty()) {
@@ -137,7 +151,7 @@ double PlanGenerator::EstimateCardinality() const {
 	exec_items = RemoveUnselectiveJoins(exec_items);
 	exec_items = AddPredicatesToPlan(exec_items);
 
-	if (exec_items.size() == 1 && !exec_items.begin()->second->combinator->HasPredicates()) {
+	if (exec_items.size() == 1 && !exec_items.begin()->second->estimator->HasPredicates()) {
 		// Single table without any predicates: return base table cardinality
 		return (double)registry.GetBaseTableCard(exec_items.begin()->first);
 	}
@@ -171,13 +185,13 @@ double PlanGenerator::EstimateCardinality() const {
 				const auto &fk_sketch = exec_item->probes_into.begin()->second;
 				auto &fk_side_item = exec_items[fk_table_name];
 
-				exec_item->combinator->Finalize();
-				auto pk_probe_set = exec_item->combinator->ComputeResult(UINT64_MAX);
+				exec_item->estimator->Finalize();
+				auto pk_probe_set = exec_item->estimator->ComputeResult(UINT64_MAX);
 				if (pk_probe_set->RecordCount() == 0) {
 					return 0;
 				}
 
-				fk_side_item->combinator->AddPredicate(fk_sketch, pk_probe_set);
+				fk_side_item->estimator->AddPredicate(fk_sketch, pk_probe_set);
 				fk_side_item->probed_from.erase(table_name);
 				exec_item->done = true;
 				items_alive--;
@@ -187,8 +201,8 @@ double PlanGenerator::EstimateCardinality() const {
 			if (CheckIfResolvable(exec_item)) {
 				std::shared_ptr<PlanExecItem> item_to_probe_into = nullptr;
 				std::shared_ptr<PointOmniSketch> sketch_to_probe_into = nullptr;
-				exec_item->combinator->Finalize();
-				auto pk_probe_set = exec_item->combinator->ComputeResult(UINT64_MAX);
+				exec_item->estimator->Finalize();
+				auto pk_probe_set = exec_item->estimator->ComputeResult(UINT64_MAX);
 				if (pk_probe_set->RecordCount() == 0) {
 					return 0;
 				}
@@ -204,7 +218,7 @@ double PlanGenerator::EstimateCardinality() const {
 						item_to_probe_into = fk_side_item;
 						sketch_to_probe_into = fk_omni_sketch;
 					} else {
-						pk_probe_set = fk_side_item->combinator->FilterProbeSet(fk_omni_sketch, pk_probe_set);
+						pk_probe_set = fk_side_item->estimator->FilterProbeSet(fk_omni_sketch, pk_probe_set);
 						fk_side_item->probed_from.erase(table_name);
 						fk_side_item->done = true;
 						items_alive--;
@@ -216,7 +230,7 @@ double PlanGenerator::EstimateCardinality() const {
 				}
 
 				if (item_to_probe_into && sketch_to_probe_into) {
-					item_to_probe_into->combinator->AddPredicate(sketch_to_probe_into, pk_probe_set);
+					item_to_probe_into->estimator->AddPredicate(sketch_to_probe_into, pk_probe_set);
 					item_to_probe_into->probed_from.erase(table_name);
 					exec_item->done = true;
 					items_alive--;
@@ -236,8 +250,8 @@ double PlanGenerator::EstimateCardinality() const {
 
 	assert(plan_item->probes_into.empty());
 	assert(plan_item->probed_from.empty());
-	plan_item->combinator->Finalize();
-	auto card_est = plan_item->combinator->ComputeResult(UINT64_MAX);
+	plan_item->estimator->Finalize();
+	auto card_est = plan_item->estimator->ComputeResult(UINT64_MAX);
 	return (double)card_est->RecordCount();
 }
 

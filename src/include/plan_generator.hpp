@@ -14,7 +14,7 @@ struct PlanItem {
 };
 
 struct PlanExecItem {
-	std::shared_ptr<OmniSketchCombinator> combinator;
+	std::shared_ptr<CombinedPredicateEstimator> estimator;
 	std::unordered_map<std::string, std::shared_ptr<PointOmniSketch>> probes_into;
 	std::unordered_set<std::string> probed_from;
 	bool done = false;
@@ -22,12 +22,8 @@ struct PlanExecItem {
 
 class PlanGenerator {
 public:
-	explicit PlanGenerator(
-	    bool use_referencing_sketches_p = false)
+	explicit PlanGenerator(bool use_referencing_sketches_p = false)
 	    : use_referencing_sketches(use_referencing_sketches_p) {
-			combinator_creator = []() {
-				return std::make_shared<ExhaustiveCombinator>();
-			};
 	}
 	void AddPredicate(const std::string &table_name, const std::string &column_name,
 	                  const std::shared_ptr<OmniSketchCell> &probe_set);
@@ -44,7 +40,6 @@ protected:
 	AddPredicatesToPlan(const std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> &before) const;
 
 	std::unordered_map<std::string, std::shared_ptr<PlanItem>> plan_items;
-	std::function<std::shared_ptr<OmniSketchCombinator>()> combinator_creator;
 	bool use_referencing_sketches = false;
 };
 

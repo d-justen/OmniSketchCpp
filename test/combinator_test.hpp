@@ -9,11 +9,10 @@ static constexpr size_t WIDTH = 16;
 static constexpr size_t DEPTH = 3;
 static constexpr size_t SAMPLE_COUNT = 16;
 
-template <typename T>
 class CombinatorTestFixture : public testing::Test {
 protected:
 	CombinatorTestFixture() {
-		combinator = std::make_unique<T>();
+		combinator = std::make_unique<omnisketch::CombinedPredicateEstimator>(SAMPLE_COUNT);
 		sketch_1 = std::make_shared<omnisketch::TypedPointOmniSketch<int>>(WIDTH, DEPTH, SAMPLE_COUNT);
 		sketch_2 = std::make_shared<omnisketch::TypedPointOmniSketch<int>>(WIDTH, DEPTH, SAMPLE_COUNT);
 		sketch_3 = std::make_shared<omnisketch::TypedPointOmniSketch<int>>(WIDTH, DEPTH, SAMPLE_COUNT);
@@ -54,7 +53,7 @@ protected:
 		probe_result_3 = std::make_shared<omnisketch::OmniSketchCell>(probe_set_3, 16);
 	}
 
-	std::unique_ptr<T> combinator;
+	std::unique_ptr<omnisketch::CombinedPredicateEstimator> combinator;
 	std::shared_ptr<omnisketch::TypedPointOmniSketch<int>> sketch_1;
 	std::shared_ptr<omnisketch::TypedPointOmniSketch<int>> sketch_2;
 	std::shared_ptr<omnisketch::TypedPointOmniSketch<int>> sketch_3;
