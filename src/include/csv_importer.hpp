@@ -31,7 +31,6 @@ public:
 	                        const std::vector<ColumnType> &types, std::vector<OmniSketchConfig> configs);
 	static void ImportTables(const std::string &path_to_definition_file);
 	static std::vector<CountQuery> ImportQueries(const std::string &path_to_query_file,
-	                                             const std::shared_ptr<OmniSketchCombinator> &combinator,
 	                                             bool use_ref_sketches);
 
 	static std::pair<std::vector<std::string>, std::vector<std::string>>

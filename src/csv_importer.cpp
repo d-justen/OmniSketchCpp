@@ -253,7 +253,6 @@ std::shared_ptr<OmniSketchCell> ConvertSet(const std::string &table_name, const 
 }
 
 std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_query_file,
-                                                   const std::shared_ptr<OmniSketchCombinator> &combinator,
                                                    bool use_ref_sketches) {
 	std::ifstream query_stream(path_to_query_file);
 	std::string line;
@@ -264,7 +263,7 @@ std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_qu
 		auto vals = Split(line, '|');
 		assert(vals.size() == 3);
 		CountQuery query;
-		query.plan = PlanGenerator(combinator, use_ref_sketches);
+		query.plan = PlanGenerator(use_ref_sketches);
 		query.cardinality = std::stoul(vals[2]);
 
 		const auto joins = Split(vals[0]);

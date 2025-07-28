@@ -89,23 +89,4 @@ protected:
 	                           std::vector<double> &match_counts, std::shared_ptr<OmniSketchCell> &result) const;
 };
 
-class UncorrelatedCombinator : public OmniSketchCombinator {
-public:
-	void AddPredicate(std::shared_ptr<OmniSketch> omni_sketch, std::shared_ptr<OmniSketchCell> probe_sample) override;
-	void AddUnfilteredRids(std::shared_ptr<OmniSketch> omni_sketch) override;
-	void AddUnfilteredRids(std::shared_ptr<OmniSketchCell> rid_sample) override;
-	bool HasPredicates() const override;
-	std::shared_ptr<OmniSketchCell> ComputeResult(size_t max_output_size) const override;
-	std::shared_ptr<OmniSketchCell> FilterProbeSet(std::shared_ptr<OmniSketch> omni_sketch,
-	                                               std::shared_ptr<OmniSketchCell> probe_sample) const override;
-	void Finalize() override {
-	}
-
-protected:
-	std::vector<std::pair<std::shared_ptr<OmniSketch>, std::shared_ptr<OmniSketchCell>>> joins;
-	std::vector<std::shared_ptr<MinHashSketch>> join_results;
-	double query_selectivity = 1;
-	size_t base_card;
-};
-
 } // namespace omnisketch

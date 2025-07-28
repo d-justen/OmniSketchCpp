@@ -23,19 +23,11 @@ struct PlanExecItem {
 class PlanGenerator {
 public:
 	explicit PlanGenerator(
-	    const std::shared_ptr<OmniSketchCombinator> &combinator = std::make_shared<ExhaustiveCombinator>(),
 	    bool use_referencing_sketches_p = false)
 	    : use_referencing_sketches(use_referencing_sketches_p) {
-		if (std::dynamic_pointer_cast<ExhaustiveCombinator>(combinator)) {
 			combinator_creator = []() {
 				return std::make_shared<ExhaustiveCombinator>();
 			};
-		} else {
-			assert(std::dynamic_pointer_cast<UncorrelatedCombinator>(combinator));
-			combinator_creator = []() {
-				return std::make_shared<UncorrelatedCombinator>();
-			};
-		}
 	}
 	void AddPredicate(const std::string &table_name, const std::string &column_name,
 	                  const std::shared_ptr<OmniSketchCell> &probe_set);
