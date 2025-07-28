@@ -44,6 +44,7 @@ void CombinedPredicateEstimator::AddPredicate(const std::shared_ptr<OmniSketch> 
 		if (pred_result.selectivity == 0) {
 			pred_result.fallback_selectivity = omni_sketch->EstimateAverageMatchesPerProbe();
 		}
+		intermediate_results.push_back(pred_result);
 		return;
 	}
 
@@ -61,6 +62,7 @@ void CombinedPredicateEstimator::AddPredicate(const std::shared_ptr<OmniSketch> 
 	if (pred_result.selectivity == 0) {
 		pred_result.fallback_selectivity = omni_sketch->EstimateAverageMatchesPerProbe();
 	}
+	intermediate_results.push_back(pred_result);
 }
 
 std::vector<std::shared_ptr<MinHashSketch>>

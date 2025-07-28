@@ -148,7 +148,6 @@ void CSVImporter::ImportTables(const std::string &path_to_definition_file) {
 		std::shared_ptr<OmniSketchType> reference_type;
 		if (tokens.size() == 5) {
 			referencing_table_ids = ExtractReferencingTables(tokens[4]);
-		} else {
 			assert(tokens[3] == "P");
 			reference_type = std::make_shared<OmniSketchType>(OmniSketchType::PRE_JOINED);
 		}
@@ -252,8 +251,7 @@ std::shared_ptr<OmniSketchCell> ConvertSet(const std::string &table_name, const 
 	throw std::logic_error("Data type not supported");
 }
 
-std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_query_file,
-                                                   bool use_ref_sketches) {
+std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_query_file, bool use_ref_sketches) {
 	std::ifstream query_stream(path_to_query_file);
 	std::string line;
 
