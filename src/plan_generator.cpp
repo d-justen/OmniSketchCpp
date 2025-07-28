@@ -113,16 +113,9 @@ PlanGenerator::AddPredicatesToPlan(const std::unordered_map<std::string, std::sh
 				    registry.FindReferencingOmniSketch(table_name, column_name, plan_item->probes_into.begin()->first);
 
 				if (referencing_sketch && use_referencing_sketches) {
-					if (referencing_sketch->Type() == OmniSketchType::FOREIGN_SORTED) {
-						// Coordinated sketch contains own table rids: probe foreign key sketch with results
-						auto &foreign_key_sketch = exec_item->probes_into.begin()->second;
-						fk_side_exec_item->combinator->AddPredicate(foreign_key_sketch,
-						                                            referencing_sketch->ProbeHashedSet(probe_values));
-					} else {
 						// Coordinated sketch has rids of its join partner: we can treat it like a predicate on the FK
 						// side
 						fk_side_exec_item->combinator->AddPredicate(referencing_sketch, probe_values);
-					}
 					fk_side_exec_item->probed_from.erase(table_name);
 					continue;
 				}

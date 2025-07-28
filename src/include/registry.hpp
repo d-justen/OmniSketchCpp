@@ -2,11 +2,11 @@
 
 #include <dirent.h>
 #include <fstream>
+#include <iostream>
 #include <variant>
 
 #include "json/json.hpp"
 #include "omni_sketch/standard_omni_sketch.hpp"
-#include "omni_sketch/foreign_sorted_omni_sketch.hpp"
 #include "omni_sketch/pre_joined_omni_sketch.hpp"
 
 namespace omnisketch {

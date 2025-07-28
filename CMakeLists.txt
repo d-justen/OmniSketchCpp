@@ -24,7 +24,6 @@ set(SOURCE_FILES
         src/include/min_hash_sketch/min_hash_sketch_set.hpp
         src/include/min_hash_sketch/min_hash_sketch_vector.hpp
 
-        src/include/omni_sketch/foreign_sorted_omni_sketch.hpp
         src/include/omni_sketch/omni_sketch.hpp
         src/include/omni_sketch/omni_sketch_cell.hpp
         src/include/omni_sketch/pre_joined_omni_sketch.hpp

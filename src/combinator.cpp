@@ -27,7 +27,7 @@ void ExhaustiveCombinator::AddPredicate(std::shared_ptr<OmniSketch> omni_sketch,
 		probe_sample->SetMinHashSketch(probe_sample->GetMinHashSketch()->Resize(MAX_JOIN_PROBE_COUNT));
 	}
 
-	if (omni_sketch->Type() == OmniSketchType::FOREIGN_SORTED || probe_sample->SampleCount() == 0) {
+	if (probe_sample->SampleCount() == 0) {
 		sampling_probabilities.push_back(1);
 	} else {
 		sampling_probabilities.push_back(probe_sample->SamplingProbability());

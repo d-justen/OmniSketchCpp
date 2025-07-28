@@ -12,7 +12,7 @@
 
 namespace omnisketch {
 
-enum class OmniSketchType { STANDARD, PRE_JOINED, FOREIGN_SORTED };
+enum class OmniSketchType { STANDARD, PRE_JOINED };
 
 class OmniSketch {
 public:

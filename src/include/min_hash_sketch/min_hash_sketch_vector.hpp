@@ -15,22 +15,22 @@ public:
 	}
 
 	void SetValid(size_t index) {
-		size_t byte_idx = index / 8;
-		size_t bit_idx = index % 8;
+		size_t byte_idx = index >> 3;
+		size_t bit_idx = index & 7;
 		mask_[byte_idx] |= (1 << bit_idx);
 	}
 
 	void SetInvalid(size_t index) {
-		size_t byte_idx = index / 8;
-		size_t bit_idx = index % 8;
+		size_t byte_idx = index >> 3;
+		size_t bit_idx = index & 7;
 		mask_[byte_idx] &= ~(1 << bit_idx);
 		// TODO: implement a more robust method to track invalids. Repeated SetInvalid calls would be tracked twice
 		invalid_counter++;
 	}
 
 	bool IsValid(size_t index) const {
-		size_t byte_idx = index / 8;
-		size_t bit_idx = index % 8;
+		size_t byte_idx = index >> 3;
+		size_t bit_idx = index & 7;
 		return (mask_[byte_idx] >> bit_idx) & 1;
 	}
 
@@ -64,6 +64,9 @@ public:
 				++it;
 			}
 		}
+		uint64_t CurrentValueOrDefault(uint64_t default_val) override {
+			return default_val;
+		}
 		bool IsAtEnd() override {
 			return offset == value_count;
 		}
@@ -95,7 +98,8 @@ public:
 	explicit MinHashSketchVector(size_t max_count_p) : max_count(max_count_p) {
 		data.reserve(max_count);
 	}
-	MinHashSketchVector(std::vector<uint64_t> data_p, size_t max_count_p) : data(std::move(data_p)), max_count(max_count_p) {
+	MinHashSketchVector(std::vector<uint64_t> data_p, size_t max_count_p)
+	    : data(std::move(data_p)), max_count(max_count_p) {
 	}
 
 	void AddRecord(uint64_t hash) override;

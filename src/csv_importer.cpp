@@ -23,22 +23,14 @@ CreateExtendingSketchAndFunc(const std::string &table_name, const std::string &c
 	registry.CreateOmniSketch<T>(table_name, column_name, config);
 	if (!config.referencing_type) {
 		return CSVImporter::CreateInsertFunc<T>(table_name, column_name);
-	}
-	if (*config.referencing_type == OmniSketchType::PRE_JOINED) {
+	} else {
+		assert(*config.referencing_type == OmniSketchType::PRE_JOINED);
 		for (size_t i = 0; i < referencing_table_names.size(); i++) {
 			registry.CreateExtendingOmniSketch<PreJoinedOmniSketch<T>, T>(
 			    table_name, column_name, referencing_table_names[i], referencing_column_names[i], config);
 		}
 		return CSVImporter::CreateInsertFunc<T, PreJoinedOmniSketch<T>>(table_name, column_name,
 		                                                                referencing_table_names);
-	} else {
-		assert(*config.referencing_type == OmniSketchType::FOREIGN_SORTED);
-		for (size_t i = 0; i < referencing_table_names.size(); i++) {
-			registry.CreateExtendingOmniSketch<ForeignSortedOmniSketch<T>, T>(
-			    table_name, column_name, referencing_table_names[i], referencing_column_names[i], config);
-		}
-		return CSVImporter::CreateInsertFunc<T, ForeignSortedOmniSketch<T>>(table_name, column_name,
-		                                                                    referencing_table_names);
 	}
 }
 
@@ -156,12 +148,9 @@ void CSVImporter::ImportTables(const std::string &path_to_definition_file) {
 		std::shared_ptr<OmniSketchType> reference_type;
 		if (tokens.size() == 5) {
 			referencing_table_ids = ExtractReferencingTables(tokens[4]);
-			if (tokens[3] == "P") {
-				reference_type = std::make_shared<OmniSketchType>(OmniSketchType::PRE_JOINED);
-			} else {
-				assert(tokens[3] == "F");
-				reference_type = std::make_shared<OmniSketchType>(OmniSketchType::FOREIGN_SORTED);
-			}
+		} else {
+			assert(tokens[3] == "P");
+			reference_type = std::make_shared<OmniSketchType>(OmniSketchType::PRE_JOINED);
 		}
 
 		OmniSketchConfig config;

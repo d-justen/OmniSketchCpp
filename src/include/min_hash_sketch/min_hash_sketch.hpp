@@ -14,6 +14,7 @@ public:
 	public:
 		virtual ~SketchIterator() = default;
 		virtual uint64_t Current() = 0;
+		virtual uint64_t CurrentValueOrDefault(uint64_t default_val) = 0;
 		virtual size_t CurrentIdx() = 0;
 		virtual void Next() = 0;
 		virtual bool IsAtEnd() = 0;

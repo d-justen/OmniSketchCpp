@@ -5,25 +5,17 @@
 
 namespace omnisketch {
 
-void MinHashSketchMap::AddRecord(uint64_t order_key, uint64_t hash) {
-	if (hash_index.find(order_key) != hash_index.end()) {
-		return;
-	}
+void MinHashSketchMap::AddRecord(uint64_t hash, uint64_t value) {
 	if (data.size() < max_count) {
-		auto hash_it = data.insert(hash).first;
-		hash_index[order_key] = hash_it;
+		data[hash] = value;
 	} else {
-		auto index_it = std::prev(hash_index.end());
+		auto index_it = std::prev(data.end());
 		const uint64_t max_hash = index_it->first;
 
-		if (order_key < max_hash) {
-			hash_index[order_key] = data.insert(hash).first;
+		if (hash < max_hash) {
+			data[hash] = value;
 			if (data.size() > max_count) {
-				auto data_it = index_it->second;
-				hash_index.erase(index_it);
-				data.erase(data_it);
-			} else {
-				hash_index.erase(order_key);
+				data.erase(index_it);
 			}
 		}
 	}
@@ -43,16 +35,18 @@ size_t MinHashSketchMap::MaxCount() const {
 
 std::shared_ptr<MinHashSketch> MinHashSketchMap::Resize(size_t size) const {
 	auto result = std::make_shared<MinHashSketchMap>(size);
-	auto index_it = hash_index.begin();
-	for (size_t i = 0; i < size; i++) {
-		result->AddRecord(index_it->first, *index_it->second);
-		index_it++;
+	for (auto it : data) {
+		result->AddRecord(it.first, it.second);
 	}
 	return result;
 }
 
 std::shared_ptr<MinHashSketch> MinHashSketchMap::Flatten() const {
-	std::vector<uint64_t> result_vec(data.begin(), data.end());
+	std::vector<uint64_t> result_vec;
+	result_vec.reserve(data.size());
+	for (auto it : data) {
+		result_vec.push_back(it.first);
+	}
 	return std::make_shared<MinHashSketchVector>(std::move(result_vec));
 }
 
@@ -67,11 +61,11 @@ void MinHashSketchMap::Combine(const MinHashSketch &other) {
 	assert(other_map_it);
 	while (!other_map_it->IsAtEnd()) {
 		const auto &kv_pair = other_map_it->CurrentKeyVal();
-		if (data.size() == max_count && kv_pair.first > hash_index.rbegin()->first) {
+		if (data.size() == max_count && kv_pair.first > data.rbegin()->first) {
 			return;
 		}
 		AddRecord(kv_pair.first, kv_pair.second);
-		other_map_it->NextKeyVal();
+		other_map_it->Next();
 	}
 }
 
@@ -87,7 +81,6 @@ MinHashSketchMap::Combine(const std::vector<std::shared_ptr<MinHashSketch>> &oth
 std::shared_ptr<MinHashSketch> MinHashSketchMap::Copy() const {
 	auto result = std::make_shared<MinHashSketchMap>(max_count);
 	result->data = data;
-	result->hash_index = hash_index;
 	return result;
 }
 
@@ -100,30 +93,83 @@ size_t MinHashSketchMap::EstimateByteSize() const {
 }
 
 std::unique_ptr<MinHashSketch::SketchIterator> MinHashSketchMap::Iterator() const {
-	return std::make_unique<MinHashSketchMap::SketchIterator>(hash_index.cbegin(), data.cbegin(), data.size());
+	return std::make_unique<MinHashSketchMap::SketchIterator>(data.cbegin(), data.size());
 }
 
 std::unique_ptr<MinHashSketch::SketchIterator> MinHashSketchMap::Iterator(size_t max_sample_count) const {
-	return std::make_unique<MinHashSketchMap::SketchIterator>(hash_index.cbegin(), data.cbegin(),
+	return std::make_unique<MinHashSketchMap::SketchIterator>(data.cbegin(),
 	                                                          std::min(data.size(), max_sample_count));
 }
 
-std::set<uint64_t> &MinHashSketchMap::Data() {
+std::map<uint64_t, uint64_t> &MinHashSketchMap::Data() {
 	return data;
 }
 
-const std::set<uint64_t> &MinHashSketchMap::Data() const {
+const std::map<uint64_t, uint64_t> &MinHashSketchMap::Data() const {
 	return data;
 }
 
 void MinHashSketchMap::EraseRecord(uint64_t hash) {
-	for (auto it = hash_index.begin(); it != hash_index.end(); ++it) {
-		if (*it->second == hash) {
-			data.erase(it->second);
-			hash_index.erase(it);
-			return;
+	data.erase(hash);
+}
+
+std::shared_ptr<MinHashSketchMap> MinHashSketchMap::IntersectMap(std::vector<std::shared_ptr<MinHashSketch>> &sketches,
+                                                                 size_t n_max, size_t max_sample_size) {
+	if (max_sample_size == 0) {
+		max_sample_size = UINT64_MAX;
+		for (const auto &sketch : sketches) {
+			max_sample_size = std::min(max_sample_size, sketch->MaxCount());
 		}
 	}
+
+	std::vector<std::unique_ptr<MinHashSketch::SketchIterator>> offsets;
+	offsets.reserve(sketches.size());
+
+	for (const auto &sketch : sketches) {
+		offsets.push_back(sketch->Iterator(max_sample_size));
+	}
+
+	auto result = std::make_shared<MinHashSketchMap>(max_sample_size);
+	auto &result_data = result->Data();
+
+	while (!offsets[0]->IsAtEnd()) {
+		uint64_t current_hash = offsets[0]->Current();
+		size_t current_n_max = std::max(n_max, (size_t)offsets[0]->CurrentValueOrDefault(0));
+
+		bool found_match = true;
+		for (size_t sketch_idx = 1; sketch_idx < offsets.size(); sketch_idx++) {
+			uint64_t other_hash = offsets[sketch_idx]->Current();
+			while (!offsets[sketch_idx]->IsAtEnd() && other_hash < current_hash) {
+				offsets[sketch_idx]->Next();
+				other_hash = offsets[sketch_idx]->Current();
+			}
+
+			if (offsets[sketch_idx]->IsAtEnd()) {
+				// There can be no other matches
+				return result;
+			}
+
+			if (current_hash == other_hash) {
+				// We have a match
+				current_n_max = std::max(current_n_max, (size_t)offsets[sketch_idx]->CurrentValueOrDefault(0));
+				continue;
+			}
+
+			// No match, start from the beginning
+			found_match = false;
+			while (!offsets[0]->IsAtEnd() && offsets[0]->Current() < other_hash) {
+				offsets[0]->Next();
+			}
+			// Back to the start
+			break;
+		}
+		if (found_match) {
+			result_data[current_hash] = static_cast<uint64_t>((double) current_n_max /(double ) max_sample_size);
+			offsets[0]->Next();
+		}
+	}
+
+	return result;
 }
 
 } // namespace omnisketch

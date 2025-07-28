@@ -1,6 +1,5 @@
 #pragma once
 
-#include "omni_sketch/foreign_sorted_omni_sketch.hpp"
 #include "omni_sketch/pre_joined_omni_sketch.hpp"
 #include "registry.hpp"
 #include "plan_generator.hpp"
