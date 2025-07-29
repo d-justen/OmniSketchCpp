@@ -177,7 +177,7 @@ public:
 				nlohmann::json cell_obj;
 				cell_obj["record_count"] = cell.RecordCount();
 				cell_obj["max_sample_count"] = cell.MaxSampleCount();
-				nlohmann::json mhs_obj;
+				nlohmann::json mhs_obj = nlohmann::json::array();
 				for (auto it = cell.GetMinHashSketch()->Iterator(); !it->IsAtEnd(); it->Next()) {
 					mhs_obj.push_back(it->Current());
 				}

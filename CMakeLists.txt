@@ -18,6 +18,8 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
 endif()
 
 set(SOURCE_FILES
+        src/include/execution/plan_node.hpp
+        src/include/execution/query_graph.hpp
         src/include/min_hash_sketch/min_hash_sketch.hpp
         src/include/min_hash_sketch/min_hash_sketch_map.hpp
         src/include/min_hash_sketch/min_hash_sketch_set.hpp
@@ -36,6 +38,9 @@ set(SOURCE_FILES
         src/include/plan_generator.hpp
         src/include/registry.hpp
         src/include/set_membership.hpp
+
+        src/execution/plan_node.cpp
+        src/execution/query_graph.cpp
 
         src/min_hash_sketch/min_hash_sketch_map.cpp
         src/min_hash_sketch/min_hash_sketch_set.cpp

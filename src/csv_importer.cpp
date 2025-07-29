@@ -1,5 +1,7 @@
 #include "csv_importer.hpp"
 
+#include "execution/plan_node.hpp"
+#include "execution/query_graph.hpp"
 #include "registry.hpp"
 
 namespace omnisketch {
@@ -23,15 +25,41 @@ CreateExtendingSketchAndFunc(const std::string &table_name, const std::string &c
 	registry.CreateOmniSketch<T>(table_name, column_name, config);
 	if (!config.referencing_type) {
 		return CSVImporter::CreateInsertFunc<T>(table_name, column_name);
-	} else {
-		assert(*config.referencing_type == OmniSketchType::PRE_JOINED);
+	}
+	if (*config.referencing_type == OmniSketchType::PRE_JOINED) {
 		for (size_t i = 0; i < referencing_table_names.size(); i++) {
 			registry.CreateExtendingOmniSketch<PreJoinedOmniSketch<T>, T>(
 			    table_name, column_name, referencing_table_names[i], referencing_column_names[i], config);
 		}
 		return CSVImporter::CreateInsertFunc<T, PreJoinedOmniSketch<T>>(table_name, column_name,
 		                                                                referencing_table_names);
+	} else {
+		throw std::runtime_error("Referencing type not supported.");
 	}
+}
+
+bool ReadLogicalLine(std::ifstream &in, std::string &lineOut) {
+	lineOut.clear();
+	bool escaping = false;
+
+	char c;
+	while (in.get(c)) {
+		if (escaping) {
+			lineOut += '\\'; // preserve the backslash
+			lineOut += c;    // preserve escaped char (e.g., 'n')
+			escaping = false;
+		} else if (c == '\\') {
+			escaping = true;
+		} else if (c == '\n') {
+			// Unescaped newline: end of logical line
+			return true;
+		} else {
+			lineOut += c;
+		}
+	}
+
+	// If we reached EOF and accumulated content, return the final line
+	return !lineOut.empty();
 }
 
 void CSVImporter::ImportTable(const std::string &path, const std::string &table_name,
@@ -75,7 +103,7 @@ void CSVImporter::ImportTable(const std::string &path, const std::string &table_
 
 	std::ifstream table_stream(path);
 	std::string line;
-	while (std::getline(table_stream, line)) {
+	while (ReadLogicalLine(table_stream, line)) {
 		auto tokens = Split(line);
 		for (size_t i = 0; i < column_names.size() - 1; i++) {
 			insert_funcs[i](tokens[i + 1], std::stoul(tokens[0]));
@@ -85,10 +113,6 @@ void CSVImporter::ImportTable(const std::string &path, const std::string &table_
 	table_stream.close();
 	for (size_t i = 1; i < column_names.size(); i++) {
 		Registry::Get().GetOmniSketch(table_name, column_names[i])->Flatten();
-		for (auto &referencing_tbl_name : referencing_table_names) {
-			Registry::Get().FindReferencingOmniSketch(table_name, column_names[i], referencing_tbl_name)->Flatten();
-		}
-		// TODO: What about referencing OmniSketches??
 	}
 }
 
@@ -148,8 +172,11 @@ void CSVImporter::ImportTables(const std::string &path_to_definition_file) {
 		std::shared_ptr<OmniSketchType> reference_type;
 		if (tokens.size() == 5) {
 			referencing_table_ids = ExtractReferencingTables(tokens[4]);
-			assert(tokens[3] == "P");
-			reference_type = std::make_shared<OmniSketchType>(OmniSketchType::PRE_JOINED);
+			if (tokens[3] == "P") {
+				reference_type = std::make_shared<OmniSketchType>(OmniSketchType::PRE_JOINED);
+			} else {
+				throw std::runtime_error("Foreign sorted is deprecated and not supported anymore.");
+			}
 		}
 
 		OmniSketchConfig config;
@@ -163,7 +190,8 @@ void CSVImporter::ImportTables(const std::string &path_to_definition_file) {
 
 std::shared_ptr<OmniSketchCell> ConvertPoint(const std::string &table_name, const std::string &column_name,
                                              const std::string &val) {
-	auto sketch = Registry::Get().GetOmniSketch(table_name, column_name);
+	auto &registry = Registry::Get();
+	auto sketch = registry.GetOmniSketch(table_name, column_name);
 	if (std::dynamic_pointer_cast<TypedPointOmniSketch<int32_t>>(sketch)) {
 		return PredicateConverter::ConvertPoint<int32_t>(std::stoi(val));
 	}
@@ -251,7 +279,7 @@ std::shared_ptr<OmniSketchCell> ConvertSet(const std::string &table_name, const 
 	throw std::logic_error("Data type not supported");
 }
 
-std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_query_file, bool use_ref_sketches) {
+std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_query_file) {
 	std::ifstream query_stream(path_to_query_file);
 	std::string line;
 
@@ -261,7 +289,7 @@ std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_qu
 		auto vals = Split(line, '|');
 		assert(vals.size() == 3);
 		CountQuery query;
-		query.plan = PlanGenerator(use_ref_sketches);
+		query.plan = QueryGraph();
 		query.cardinality = std::stoul(vals[2]);
 
 		const auto joins = Split(vals[0]);
@@ -273,11 +301,12 @@ std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_qu
 			assert(left_side.size() == 2 && right_side.size() == 2);
 			const bool left_is_fk_side = Registry::Get().HasOmniSketch(left_side[0], left_side[1]);
 			const bool right_is_fk_side = Registry::Get().HasOmniSketch(right_side[0], right_side[1]);
-			assert((left_is_fk_side && !right_is_fk_side) || (!left_is_fk_side && right_is_fk_side));
-			if (left_is_fk_side) {
-				query.plan.AddJoin(left_side[0], left_side[1], right_side[0]);
+			if (left_is_fk_side && !right_is_fk_side) {
+				query.plan.AddPkFkJoin(left_side[0], left_side[1], right_side[0]);
+			} else if (right_is_fk_side && !left_is_fk_side) {
+				query.plan.AddPkFkJoin(right_side[0], right_side[1], left_side[0]);
 			} else {
-				query.plan.AddJoin(right_side[0], right_side[1], left_side[0]);
+				query.plan.AddFkFkJoin(left_side[0], left_side[1], right_side[0], right_side[1]);
 			}
 		}
 
@@ -296,12 +325,12 @@ std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_qu
 			const auto &value = predicates[predicate_idx + 2];
 
 			if (operand == "=") {
-				query.plan.AddPredicate(table_name, column_name, ConvertPoint(table_name, column_name, value));
+				query.plan.AddConstantPredicate(table_name, column_name, ConvertPoint(table_name, column_name, value));
 			} else if (operand == ">" || operand == ">=") {
 				const bool lb_excl = operand == ">";
 				if (lt_predicates.find(column_id) != lt_predicates.end()) {
 					const auto &lt_predicate = lt_predicates[column_id];
-					query.plan.AddPredicate(
+					query.plan.AddConstantPredicate(
 					    table_name, column_name,
 					    ConvertRange(table_name, column_name, value, lt_predicate.first, lb_excl, lt_predicate.second));
 					lt_predicates.erase(column_id);
@@ -312,7 +341,7 @@ std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_qu
 				const bool ub_excl = operand == ">";
 				if (gt_predicates.find(column_id) != gt_predicates.end()) {
 					auto &gt_predicate = gt_predicates[column_id];
-					query.plan.AddPredicate(
+					query.plan.AddConstantPredicate(
 					    table_name, column_name,
 					    ConvertRange(table_name, column_name, gt_predicate.first, value, gt_predicate.second, ub_excl));
 					gt_predicates.erase(column_id);
@@ -321,7 +350,7 @@ std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_qu
 				}
 			} else if (operand == "E") {
 				const auto values = Split(value, ';');
-				query.plan.AddPredicate(table_name, column_name, ConvertSet(table_name, column_name, values));
+				query.plan.AddConstantPredicate(table_name, column_name, ConvertSet(table_name, column_name, values));
 			} else {
 				throw std::logic_error("Unknown operand");
 			}
@@ -329,16 +358,16 @@ std::vector<CountQuery> CSVImporter::ImportQueries(const std::string &path_to_qu
 
 		for (auto &gt_predicate : gt_predicates) {
 			const auto table_column = Split(gt_predicate.first, '.');
-			query.plan.AddPredicate(table_column[0], table_column[1],
-			                        ConvertRange(table_column[0], table_column[1], gt_predicate.second.first, "",
-			                                     gt_predicate.second.second, false));
+			query.plan.AddConstantPredicate(table_column[0], table_column[1],
+			                                ConvertRange(table_column[0], table_column[1], gt_predicate.second.first,
+			                                             "", gt_predicate.second.second, false));
 		}
 
 		for (auto &lt_predicate : lt_predicates) {
 			const auto table_column = Split(lt_predicate.first, '.');
-			query.plan.AddPredicate(table_column[0], table_column[1],
-			                        ConvertRange(table_column[0], table_column[1], "", lt_predicate.second.first, false,
-			                                     lt_predicate.second.second));
+			query.plan.AddConstantPredicate(table_column[0], table_column[1],
+			                                ConvertRange(table_column[0], table_column[1], "",
+			                                             lt_predicate.second.first, false, lt_predicate.second.second));
 		}
 
 		queries.push_back(query);
@@ -354,9 +383,29 @@ std::vector<std::string> CSVImporter::Split(const std::string &line, char sep) {
 	std::stringstream ss(line);
 	std::string token;
 
-	while (std::getline(ss, token, sep)) {
-		tokens.push_back(token);
+	bool in_escape = false;
+
+	for (size_t i = 0; i < line.size(); ++i) {
+		char c = line[i];
+
+		if (c == '"') {
+			if (!line.empty() && line.back() == '"') {
+				// Double escape
+				token += c;
+			}
+			in_escape = !in_escape;
+		} else if (c == sep) {
+			if (in_escape) {
+				token += c;
+			} else {
+				tokens.push_back(token);
+				token.clear();
+			}
+		} else {
+			token += c;
+		}
 	}
+	tokens.push_back(token);
 
 	return tokens;
 }

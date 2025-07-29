@@ -1,5 +1,6 @@
 #pragma once
 
+#include "execution/query_graph.hpp"
 #include "omni_sketch/pre_joined_omni_sketch.hpp"
 #include "registry.hpp"
 #include "plan_generator.hpp"
@@ -13,7 +14,7 @@ namespace omnisketch {
 enum class ColumnType { INT, UINT, DOUBLE, VARCHAR };
 
 struct CountQuery {
-	PlanGenerator plan;
+	QueryGraph plan;
 	size_t cardinality = 0;
 };
 
@@ -30,8 +31,7 @@ public:
 	                        const std::vector<std::string> &referencing_column_names,
 	                        const std::vector<ColumnType> &types, std::vector<OmniSketchConfig> configs);
 	static void ImportTables(const std::string &path_to_definition_file);
-	static std::vector<CountQuery> ImportQueries(const std::string &path_to_query_file,
-	                                             bool use_ref_sketches);
+	static std::vector<CountQuery> ImportQueries(const std::string &path_to_query_file);
 
 	static std::pair<std::vector<std::string>, std::vector<std::string>>
 	ExtractReferencingTables(const std::string &input);

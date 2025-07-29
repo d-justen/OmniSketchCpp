@@ -42,7 +42,7 @@ void CombinedPredicateEstimator::AddPredicate(const std::shared_ptr<OmniSketch> 
 		pred_result.n_max = GetNMax(matches);
 		pred_result.selectivity = (double)probe_result->RecordCount() / (double)base_card;
 		if (pred_result.selectivity == 0) {
-			pred_result.fallback_selectivity = omni_sketch->EstimateAverageMatchesPerProbe();
+			pred_result.fallback_selectivity = (omni_sketch->EstimateAverageMatchesPerProbe() / (double)base_card);
 		}
 		intermediate_results.push_back(pred_result);
 		return;
@@ -60,7 +60,8 @@ void CombinedPredicateEstimator::AddPredicate(const std::shared_ptr<OmniSketch> 
 
 	pred_result.selectivity = (double)cardinality / (double)base_card;
 	if (pred_result.selectivity == 0) {
-		pred_result.fallback_selectivity = omni_sketch->EstimateAverageMatchesPerProbe();
+		pred_result.fallback_selectivity =
+		    (omni_sketch->EstimateAverageMatchesPerProbe() / (double)base_card) * (double)probe_sample->SampleCount();
 	}
 	intermediate_results.push_back(pred_result);
 }

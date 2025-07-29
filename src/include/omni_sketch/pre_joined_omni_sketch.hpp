@@ -15,7 +15,7 @@ public:
 	    : PointOmniSketch(width_p, depth_p, max_sample_count_p, std::move(set_membership_algo_p),
 	                      std::move(hash_processor_p)),
 	      referenced_sketch(std::move(sketch)), hf(std::move(hash_function_p)) {
-		probe_buffer.resize(referenced_sketch->Depth());
+		probe_buffer.resize(depth);
 	}
 
 	PreJoinedOmniSketch(std::shared_ptr<OmniSketch> sketch, size_t width, size_t depth, size_t max_sample_count_p)
