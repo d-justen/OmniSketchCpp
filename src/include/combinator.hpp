@@ -62,6 +62,9 @@ public:
 	std::shared_ptr<OmniSketchCell> FilterProbeSet(const std::shared_ptr<OmniSketch> &omni_sketch,
 	                                               const std::shared_ptr<OmniSketchCell> &probe_sample) const;
 	void Finalize();
+	void SetBaseCard(size_t base_card_p) {
+		base_card = base_card_p;
+	}
 
 protected:
 	std::vector<PredicateResult> intermediate_results;

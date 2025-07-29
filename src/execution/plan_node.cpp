@@ -79,7 +79,7 @@ std::shared_ptr<OmniSketchCell> PlanNode::Estimate() const {
 		estimator.AddPredicate(filter.first, filter.second);
 	}
 	if (!estimator.HasPredicates()) {
-		estimator.AddUnfilteredRids(registry.ProduceRidSample(table_name), base_card);
+		estimator.SetBaseCard(base_card);
 	}
 	estimator.Finalize();
 

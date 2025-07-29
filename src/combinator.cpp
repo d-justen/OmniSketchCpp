@@ -90,8 +90,11 @@ double GetPSample(const std::vector<PredicateResult> &intermediates) {
 }
 
 std::shared_ptr<OmniSketchCell> CombinedPredicateEstimator::ComputeResult(size_t max_output_size) const {
-	assert(!intermediate_results.empty());
 	auto result = std::make_shared<OmniSketchCell>(max_output_size);
+	if (intermediate_results.empty()) {
+		result->SetRecordCount(base_card);
+		return result;
+	}
 
 	if (intermediate_results.size() == 1) {
 		auto &intermediate = intermediate_results.front();
