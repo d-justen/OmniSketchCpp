@@ -29,6 +29,12 @@ struct RelationNode {
 	std::vector<std::string> contained_relations;
 };
 
+struct DpSizeResult {
+	std::set<std::string> relations;
+	double card_est;
+	size_t duration_ns;
+};
+
 class QueryGraph {
 public:
 	double Estimate();
@@ -41,7 +47,7 @@ public:
 	                 const std::string &column_name_2);
 
 public:
-	void RunDpSizeAlgo();
+	std::vector<DpSizeResult> RunDpSizeAlgo();
 
 protected:
 	void AddEdge(const std::string &table_name_1, const std::string &column_name_1, const std::string &table_name_2,

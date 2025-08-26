@@ -103,7 +103,6 @@ void PointOmniSketch::Flatten() {
 }
 
 size_t PointOmniSketch::EstimateByteSize() const {
-	/*const size_t members = 3 * sizeof(size_t) + sizeof(hash_processor) + sizeof(cells);
 	size_t cell_size = 0;
 	for (const auto &row : cells) {
 	    cell_size += sizeof(row);
@@ -112,14 +111,14 @@ size_t PointOmniSketch::EstimateByteSize() const {
 	    }
 	}
 
-	return members + cell_size;*/
-	size_t hash_count = 0;
+	return cell_size;
+	/*size_t hash_count = 0;
 	for (const auto &row : cells) {
 		for (const auto &cell : row) {
 			hash_count += cell->SampleCount();
 		}
 	}
-	return hash_count * sizeof(uint64_t);
+	return hash_count * sizeof(uint64_t);*/
 }
 
 size_t PointOmniSketch::Depth() const {

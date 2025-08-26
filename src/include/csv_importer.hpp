@@ -13,9 +13,15 @@ namespace omnisketch {
 
 enum class ColumnType { INT, UINT, DOUBLE, VARCHAR };
 
+struct RelationInfo {
+	std::vector<std::string> predicates;
+	std::map<std::string, std::string> join_conditions;
+};
+
 struct CountQuery {
 	QueryGraph plan;
 	size_t cardinality = 0;
+	std::map<std::string, RelationInfo> rel_info;
 };
 
 class CSVImporter {
@@ -83,6 +89,30 @@ public:
 			}
 		};
 	}
+
+private:
+	static CountQuery ParseSingleQuery(const std::string& line);
+	static void ProcessJoins(const std::string& joinString, CountQuery& query);
+	static void ProcessPredicates(const std::string& predicateString, CountQuery& query);
+	static void ProcessSinglePredicate(const std::string& columnId, const std::string& operand, 
+	                                   const std::string& value, CountQuery& query,
+	                                   std::unordered_map<std::string, std::pair<std::string, bool>>& gtPredicates,
+	                                   std::unordered_map<std::string, std::pair<std::string, bool>>& ltPredicates);
+	static void ProcessGreaterThanPredicate(const std::string& columnId, const std::string& operand, 
+	                                        const std::string& value, const std::string& tableName, 
+	                                        const std::string& columnName, CountQuery& query,
+	                                        std::unordered_map<std::string, std::pair<std::string, bool>>& gtPredicates,
+	                                        std::unordered_map<std::string, std::pair<std::string, bool>>& ltPredicates);
+	static void ProcessLessThanPredicate(const std::string& columnId, const std::string& operand, 
+	                                     const std::string& value, const std::string& tableName, 
+	                                     const std::string& columnName, CountQuery& query,
+	                                     std::unordered_map<std::string, std::pair<std::string, bool>>& gtPredicates,
+	                                     std::unordered_map<std::string, std::pair<std::string, bool>>& ltPredicates);
+	static void ProcessInPredicate(const std::string& tableName, const std::string& columnName,
+	                               const std::string& value, bool isStringColumn, CountQuery& query);
+	static void ProcessRemainingRangePredicates(const std::unordered_map<std::string, std::pair<std::string, bool>>& gtPredicates,
+	                                            const std::unordered_map<std::string, std::pair<std::string, bool>>& ltPredicates,
+	                                            CountQuery& query);
 };
 
 } // namespace omnisketch

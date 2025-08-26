@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <queue>
+#include <sstream>
 
 namespace omnisketch {
 
@@ -413,18 +414,22 @@ std::string TreeToString(JoinNode *root) {
 	return result;
 }
 
-void QueryGraph::RunDpSizeAlgo() {
+std::vector<DpSizeResult> QueryGraph::RunDpSizeAlgo() {
 	auto &registry = Registry::Get();
 	std::unordered_map<size_t, std::vector<QueryPlan>> best_plans;
 	std::unordered_map<std::string, double> estimates;
+	std::vector<DpSizeResult> dp_size_results;
+	dp_size_results.reserve(1000);
 
 	for (auto &node : graph) {
 		QueryPlan plan;
 		plan.plan = std::make_shared<JoinNode>(JoinNode {node.first, nullptr, nullptr});
 		plan.relations.insert(node.first);
 		if (!graph[node.first].filters.empty()) {
+			DpSizeResult dp_size_result;
 			std::string relations;
 			for (auto &r : plan.relations) {
+				dp_size_result.relations.insert(r);
 				relations += r + ", ";
 			}
 
@@ -434,12 +439,11 @@ void QueryGraph::RunDpSizeAlgo() {
 			auto begin = std::chrono::steady_clock::now();
 			plan.card_est = g.Estimate();
 			auto end = std::chrono::steady_clock::now();
-			std::chrono::duration<double, std::milli> duration = end - begin;
+			dp_size_result.duration_ns = (end - begin).count();
+			dp_size_result.card_est = plan.card_est;
 
 			estimates[relations] = plan.card_est;
-
-			std::cout << "[" << relations << "], CardEst: " << plan.card_est << ", Time (ms): " << duration.count()
-			          << "\n";
+			dp_size_results.push_back(dp_size_result);
 		} else {
 			plan.card_est = (double)registry.GetBaseTableCard(node.first);
 		}
@@ -511,8 +515,10 @@ void QueryGraph::RunDpSizeAlgo() {
 						}
 					}
 
+					DpSizeResult dp_size_result;
 					std::string relations;
 					for (auto &r : plan.relations) {
+						dp_size_result.relations.insert(r);
 						relations += r + ", ";
 					}
 
@@ -526,16 +532,14 @@ void QueryGraph::RunDpSizeAlgo() {
 					}
 
 					auto end = std::chrono::steady_clock::now();
-					std::chrono::duration<double, std::milli> duration = end - begin;
+					dp_size_result.duration_ns = (end - begin).count();
+					dp_size_result.card_est = plan.card_est;
+					dp_size_results.push_back(dp_size_result);
 
 					plan.cost = left_plan.cost + right_plan.cost + plan.card_est;
 					auto left_in = left_plan.card_est > right_plan.card_est ? left_plan.plan : right_plan.plan;
 					auto right_in = left_plan.card_est > right_plan.card_est ? right_plan.plan : left_plan.plan;
 					plan.plan = std::make_shared<JoinNode>(JoinNode {{}, left_in, right_in});
-
-					std::cout << "[" << relations << "], CardEst: " << plan.card_est
-					          << ", Time (ms): " << duration.count() << ", Plan: " << TreeToString(&*plan.plan)
-					          << ", Cost: " << plan.cost << "\n";
 
 					// Now see whether this is the plan with the lowest cost
 					bool has_plan = false;
@@ -563,6 +567,7 @@ void QueryGraph::RunDpSizeAlgo() {
 
 	assert(best_plans[graph.size()].size() == 1);
 	std::cout << TreeToString(&*best_plans[graph.size()].front().plan) << "\n";
+	return dp_size_results;
 }
 
 } // namespace omnisketch

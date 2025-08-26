@@ -75,20 +75,34 @@ std::shared_ptr<OmniSketchCell> PlanNode::Estimate() const {
 	}
 
 	CombinedPredicateEstimator estimator(min_max_sample_count);
+	estimator.SetBaseCard(base_card);
 	for (auto &filter : resolved_filters) {
 		estimator.AddPredicate(filter.first, filter.second);
 	}
 	if (!estimator.HasPredicates()) {
-		estimator.SetBaseCard(base_card);
+		estimator.AddUnfilteredRids(registry.GetRidSample(table_name), base_card);
 	}
 	estimator.Finalize();
 
 	auto result = estimator.ComputeResult(UINT64_MAX);
 
 	// PK-FK Join Expansion
+	//double fallback_sel = 1;
 	for (auto &pk_join : pk_join_expansions) {
-		result = pk_join.foreign_key_node->ExpandPrimaryKeys(pk_join.foreign_key_column, *result);
+		/*size_t primary_key_count = std::min(result->RecordCount(), MAX_JOIN_PROBE_COUNT);*/
+		auto tmp_result = pk_join.foreign_key_node->ExpandPrimaryKeys(pk_join.foreign_key_column, *result);
+		if (tmp_result->SampleCount() == 0) {
+				// double filter_sel = /*1.0 / ((double)primary_key_count * 2)*/1;
+			    // double multiplicity = std::max(1.0, (double)tmp_result->RecordCount() / (double )result->RecordCount());
+			    // result->SetRecordCount((size_t)((double)result->RecordCount() * filter_sel * multiplicity));
+			    result->SetRecordCount(tmp_result->RecordCount());
+		} else {
+			result = tmp_result;
+		}
 	}
+	//if (fallback_sel < 1) {
+	//	result->SetRecordCount(static_cast<size_t>((double)result->RecordCount() * fallback_sel));
+	//}
 
 	// FK/FK Join Multiple
 	double fk_fk_multiple = CalculateFKFKMultiple();
@@ -101,27 +115,61 @@ std::shared_ptr<OmniSketchCell> PlanNode::ExpandPrimaryKeys(const std::string &c
                                                             const OmniSketchCell &primary_keys) const {
 	auto &registry = Registry::Get();
 	auto omni_sketch = registry.GetOmniSketch(table_name, column_name);
+	auto typed_omni_sketch = std::dynamic_pointer_cast<TypedPointOmniSketch<size_t>>(omni_sketch);
 
-	auto filtered_rids = Estimate();
+	std::shared_ptr<OmniSketchCell> filtered_rids;
+	double filter_selectivity = 1.0;
+	bool has_predicates = !filters.empty() || !secondary_filters.empty();
+	if (has_predicates) {
+		filtered_rids = Estimate();
+		filter_selectivity = (double)filtered_rids->RecordCount() / (double)omni_sketch->RecordCount();
+	}
+
+	/*double multiplicity = 1.0;
+	if (typed_omni_sketch) {
+		size_t domain =
+		    std::min(typed_omni_sketch->GetMax() - typed_omni_sketch->GetMin(), typed_omni_sketch->RecordCount());
+		multiplicity = domain >= typed_omni_sketch->RecordCount()
+		                          ? 1
+		                          : (double)typed_omni_sketch->RecordCount() / (double)domain;
+
+	}*/
 	auto remaining_primary_keys = std::make_shared<OmniSketchCell>(primary_keys.MaxSampleCount());
-	size_t result_card = 0;
+	double result_card = 0;
 
 	std::vector<std::shared_ptr<OmniSketchCell>> matches(omni_sketch->Depth());
-	for (auto pk_it = primary_keys.GetMinHashSketch()->Iterator(); !pk_it->IsAtEnd(); pk_it->Next()) {
+	size_t probe_count = 0;
+	for (auto pk_it = primary_keys.GetMinHashSketch()->Iterator();
+	     !pk_it->IsAtEnd() && probe_count++ < MAX_JOIN_PROBE_COUNT; pk_it->Next()) {
 		auto probe_result = omni_sketch->ProbeHash(pk_it->Current(), matches);
 		size_t n_max = 0;
 		for (auto &match : matches) {
 			n_max = std::max(n_max, match->RecordCount());
 		}
-		auto filtered_probe_result = OmniSketchCell::Intersect({probe_result, filtered_rids});
-		if (filtered_probe_result->RecordCount() > 0) {
-			remaining_primary_keys->GetMinHashSketch()->AddRecord(pk_it->Current());
-			result_card += filtered_probe_result->RecordCount();
+		if (probe_result->RecordCount() > 0) {
+			if (has_predicates) {
+				auto filtered_probe_result = OmniSketchCell::Intersect({probe_result, filtered_rids});
+				if (filtered_probe_result->RecordCount() > 0) {
+					remaining_primary_keys->GetMinHashSketch()->AddRecord(pk_it->Current());
+					result_card += (double)filtered_probe_result->RecordCount();
+				} else {
+					double match_granularity = (double)n_max / (double)omni_sketch->MinHashSketchSize();
+					result_card += match_granularity * filter_selectivity;
+					// double filtered_rids_sel = filtered_rids->SampleCount() == 0 ? 1.0 : (double)filtered_rids->RecordCount() / (double)omni_sketch->RecordCount();
+					// result_card += static_cast<size_t>(((double)primary_keys.RecordCount() / (double)primary_keys.SampleCount()) * multiplicity * filtered_rids_sel);
+				}
+			}
+		} else {
+			double match_granularity = (double)n_max / (double)omni_sketch->MinHashSketchSize();
+			result_card += match_granularity * filter_selectivity;
+			// double filtered_rids_sel = filtered_rids->SampleCount() == 0 ? 1.0 : (double)filtered_rids->RecordCount() / (double)omni_sketch->RecordCount();
+			// result_card += static_cast<size_t>(((double)primary_keys.RecordCount() / (double)primary_keys.SampleCount()) * multiplicity * filtered_rids_sel);
 		}
 	}
 
-	filtered_rids->SetRecordCount(result_card);
-	return filtered_rids;
+	double p_sample = (double)std::min(primary_keys.SampleCount(), MAX_JOIN_PROBE_COUNT) / (double )primary_keys.RecordCount();
+	remaining_primary_keys->SetRecordCount((size_t)(result_card / p_sample));
+	return remaining_primary_keys;
 }
 
 std::string PlanNode::TableName() const {

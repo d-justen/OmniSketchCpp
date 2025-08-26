@@ -19,18 +19,19 @@ public:
 		    config.set_membership_algo, config.hash_processor);
 	}
 
-	void FillOmniSketch(size_t value_count, size_t multiplicity,
+	void FillOmniSketch(size_t valueCount, size_t multiplicity,
 	                    omnisketch::TypedPointOmniSketch<size_t> *sketch = nullptr) {
 		if (!sketch) {
 			sketch = omni_sketch.get();
 		}
-		const size_t rid_count = value_count * multiplicity;
+		const size_t ridCount = valueCount * multiplicity;
 
-		for (size_t i = 0; i < rid_count; i++) {
-			sketch->AddRecord(i % value_count, i);
+		for (size_t i = 0; i < ridCount; ++i) {
+			sketch->AddRecord(i % valueCount, i);
 		}
 	}
 
+protected:
 	std::shared_ptr<omnisketch::TypedPointOmniSketch<size_t>> omni_sketch;
 	size_t current_repetition = 0;
 };

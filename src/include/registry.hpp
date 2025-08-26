@@ -50,6 +50,15 @@ public:
 		return std::dynamic_pointer_cast<TypedPointOmniSketch<T>>(sketch);
 	}
 
+	std::shared_ptr<OmniSketchCell> CreateRidSketch(const std::string &table_name, size_t size) {
+		rid_sketches[table_name] = std::make_shared<OmniSketchCell>(size);
+		return rid_sketches[table_name];
+	}
+
+	std::shared_ptr<OmniSketchCell> GetRidSample(const std::string &table_name) {
+		return rid_sketches[table_name];
+	}
+
 	template <typename T, typename U>
 	std::shared_ptr<T> CreateExtendingOmniSketch(const std::string &table_name, const std::string &column_name,
 	                                             const std::string &referencing_table_name,
@@ -145,6 +154,9 @@ public:
 				}
 			}
 		}
+		for (auto& rid_sketch : rid_sketches) {
+			result += rid_sketch.second->EstimateByteSize();
+		}
 		return result;
 	}
 
@@ -152,6 +164,25 @@ public:
 	                      const std::string &referencing_table_name, const std::string &path) {
 		auto &registry = Registry::Get();
 		nlohmann::json json_obj;
+
+		if (column_name.empty()) {
+			nlohmann::json mhs_obj = nlohmann::json::array();
+			auto cell = registry.rid_sketches[table_name];
+			for (auto it = cell->GetMinHashSketch()->Iterator(); !it->IsAtEnd(); it->Next()) {
+				mhs_obj.push_back(it->Current());
+			}
+			json_obj["table_name"] = table_name;
+			json_obj["type"] = "rid_sample";
+			json_obj["hashes"] = mhs_obj;
+			json_obj["max_sample_count"] = cell->MaxSampleCount();
+			json_obj["record_count"] = cell->RecordCount();
+			std::ofstream file;
+			file.open(path);
+			file << json_obj;
+			file.close();
+			return;
+		}
+
 
 		std::shared_ptr<PointOmniSketch> sketch;
 		if (referencing_table_name.empty()) {
@@ -244,6 +275,13 @@ public:
 		file.open(path);
 		file >> json_obj;
 		file.close();
+
+		if (json_obj["type"] == "rid_sample") {
+			std::vector<uint64_t> hashes = json_obj["hashes"];
+			auto mhs = std::make_shared<MinHashSketchVector>(hashes, json_obj["max_sample_count"]);
+			rid_sketches[json_obj["table_name"]] = std::make_shared<OmniSketchCell>(mhs, json_obj["record_count"]);
+			return;
+		}
 
 		std::shared_ptr<PointOmniSketch> sketch;
 		if (json_obj["type"] == "standard") {
@@ -375,6 +413,7 @@ public:
 private:
 	Registry();
 	std::unordered_map<std::string, TableEntry> sketches;
+	std::unordered_map<std::string, std::shared_ptr<OmniSketchCell>> rid_sketches;
 
 	bool hasJsonExtension(const std::string &filename) {
 		const std::string extension = ".json";

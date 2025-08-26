@@ -6,6 +6,8 @@
 
 namespace omnisketch {
 
+constexpr size_t MAX_JOIN_PROBE_COUNT = 32;
+
 class PredicateConverter {
 public:
 	template <typename T>
@@ -65,6 +67,17 @@ public:
 	void SetBaseCard(size_t base_card_p) {
 		base_card = base_card_p;
 	}
+
+private:
+	void ProcessSingleSamplePredicate(const std::shared_ptr<OmniSketch>& omni_sketch,
+	                                  const std::shared_ptr<OmniSketchCell>& probe_sample,
+	                                  std::vector<std::shared_ptr<OmniSketchCell>>& matches,
+	                                  PredicateResult& predicateResult);
+	
+	void ProcessMultiSamplePredicate(const std::shared_ptr<OmniSketch>& omni_sketch,
+	                                 const std::shared_ptr<OmniSketchCell>& probe_sample,
+	                                 std::vector<std::shared_ptr<OmniSketchCell>>& matches,
+	                                 PredicateResult& predicateResult);
 
 protected:
 	std::vector<PredicateResult> intermediate_results;

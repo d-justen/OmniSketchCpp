@@ -2,10 +2,9 @@
 
 namespace omnisketch {
 
-Registry::Registry() {
-}
+Registry::Registry() = default;
 
-Registry &Registry::Get() {
+Registry& Registry::Get() {
 	static Registry instance;
 	return instance;
 }

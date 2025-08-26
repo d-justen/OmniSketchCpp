@@ -5,88 +5,119 @@
 
 namespace omnisketch {
 
-constexpr size_t MAX_JOIN_PROBE_COUNT = 32;
-
-size_t GetNMax(std::vector<std::shared_ptr<OmniSketchCell>> &matches) {
-	size_t n_max = 0;
-	for (auto &match : matches) {
-		n_max = std::max(n_max, match->RecordCount());
+size_t GetMaxRecordCount(const std::vector<std::shared_ptr<OmniSketchCell>>& matches) {
+	size_t maxRecordCount = 0;
+	for (const auto& match : matches) {
+		maxRecordCount = std::max(maxRecordCount, match->RecordCount());
 	}
-	return n_max;
+	return maxRecordCount;
 }
 
-void AddResultHashesToMap(std::shared_ptr<OmniSketchCell> &result, std::shared_ptr<MinHashSketchMap> &map,
-                          size_t n_max) {
+void AddResultHashesToMap(const std::shared_ptr<OmniSketchCell>& result, 
+                          const std::shared_ptr<MinHashSketchMap>& map,
+                          size_t maxRecordCount) {
 	for (auto it = result->GetMinHashSketch()->Iterator(); !it->IsAtEnd(); it->Next()) {
-		map->AddRecord(it->Current(), n_max);
+		map->AddRecord(it->Current(), maxRecordCount);
 	}
 }
 
-void CombinedPredicateEstimator::AddPredicate(const std::shared_ptr<OmniSketch> &omni_sketch,
-                                              const std::shared_ptr<OmniSketchCell> &probe_sample) {
+void CombinedPredicateEstimator::AddPredicate(const std::shared_ptr<OmniSketch>& omni_sketch,
+                                              const std::shared_ptr<OmniSketchCell>& probe_sample) {
 	base_card = std::max(base_card, omni_sketch->RecordCount());
 
 	if (probe_sample->SampleCount() > MAX_JOIN_PROBE_COUNT) {
 		probe_sample->SetMinHashSketch(probe_sample->GetMinHashSketch()->Resize(MAX_JOIN_PROBE_COUNT));
 	}
 
-	PredicateResult pred_result;
-	pred_result.is_set_membership = probe_sample->SampleCount() > 1;
-	pred_result.sampling_probability = probe_sample->SamplingProbability();
+	PredicateResult predicateResult;
+	predicateResult.is_set_membership = probe_sample->SampleCount() > 1;
+	predicateResult.sampling_probability = probe_sample->SamplingProbability();
 
 	std::vector<std::shared_ptr<OmniSketchCell>> matches(omni_sketch->Depth());
+	
 	if (probe_sample->SampleCount() == 1) {
-		auto probe_result =
-		    omni_sketch->ProbeHash(probe_sample->GetMinHashSketch()->Iterator()->Current(), matches, max_sample_count);
-		pred_result.sketch = probe_result->GetMinHashSketch();
-		pred_result.n_max = GetNMax(matches);
-		pred_result.selectivity = (double)probe_result->RecordCount() / (double)base_card;
-		if (pred_result.selectivity == 0) {
-			pred_result.fallback_selectivity = (omni_sketch->EstimateAverageMatchesPerProbe() / (double)base_card);
-		}
-		intermediate_results.push_back(pred_result);
+		ProcessSingleSamplePredicate(omni_sketch, probe_sample, matches, predicateResult);
 		return;
 	}
 
+	ProcessMultiSamplePredicate(omni_sketch, probe_sample, matches, predicateResult);
+}
+
+void CombinedPredicateEstimator::ProcessSingleSamplePredicate(
+    const std::shared_ptr<OmniSketch>& omni_sketch,
+    const std::shared_ptr<OmniSketchCell>& probe_sample,
+    std::vector<std::shared_ptr<OmniSketchCell>>& matches,
+    PredicateResult& predicateResult) {
+	
+	auto probe_result = omni_sketch->ProbeHash(
+		probe_sample->GetMinHashSketch()->Iterator()->Current(), matches, max_sample_count);
+	
+	predicateResult.sketch = probe_result->GetMinHashSketch();
+	predicateResult.n_max = GetMaxRecordCount(matches);
+	predicateResult.selectivity = static_cast<double>(probe_result->RecordCount()) / static_cast<double>(base_card);
+	
+	if (predicateResult.selectivity == 0.0) {
+		const double normalizedMaxCount = static_cast<double>(predicateResult.n_max) / 
+		                                  static_cast<double>(omni_sketch->MinHashSketchSize());
+		predicateResult.fallback_selectivity = normalizedMaxCount / static_cast<double>(base_card);
+	}
+	
+	intermediate_results.push_back(std::move(predicateResult));
+}
+
+void CombinedPredicateEstimator::ProcessMultiSamplePredicate(
+    const std::shared_ptr<OmniSketch>& omni_sketch,
+    const std::shared_ptr<OmniSketchCell>& probe_sample,
+    std::vector<std::shared_ptr<OmniSketchCell>>& matches,
+    PredicateResult& predicateResult) {
+	
 	size_t cardinality = 0;
 	auto result_map = std::make_shared<MinHashSketchMap>(UINT64_MAX);
-	pred_result.sketch = result_map;
+	predicateResult.sketch = result_map;
+	size_t maxRecordCountSum = 0;
 
 	for (auto probe_it = probe_sample->GetMinHashSketch()->Iterator(); !probe_it->IsAtEnd(); probe_it->Next()) {
 		auto probe_result = omni_sketch->ProbeHash(probe_it->Current(), matches, max_sample_count);
-		AddResultHashesToMap(probe_result, result_map, GetNMax(matches));
+		const size_t maxRecordCount = GetMaxRecordCount(matches);
+		maxRecordCountSum += maxRecordCount;
+		AddResultHashesToMap(probe_result, result_map, maxRecordCount);
 		cardinality += probe_result->RecordCount();
 	}
 
-	pred_result.selectivity = (double)cardinality / (double)base_card;
-	if (pred_result.selectivity == 0) {
-		pred_result.fallback_selectivity =
-		    (omni_sketch->EstimateAverageMatchesPerProbe() / (double)base_card) * (double)probe_sample->SampleCount();
+	predicateResult.selectivity = static_cast<double>(cardinality) / static_cast<double>(base_card);
+	
+	if (predicateResult.selectivity == 0.0) {
+		const double avgMaxRecordCount = static_cast<double>(maxRecordCountSum) / 
+		                                 static_cast<double>(probe_sample->SampleCount());
+		const double normalizedAvg = avgMaxRecordCount / static_cast<double>(omni_sketch->MinHashSketchSize());
+		predicateResult.fallback_selectivity = (normalizedAvg / static_cast<double>(base_card)) * 
+		                                       static_cast<double>(probe_sample->SampleCount());
 	}
-	intermediate_results.push_back(pred_result);
+	
+	intermediate_results.push_back(std::move(predicateResult));
 }
 
 std::vector<std::shared_ptr<MinHashSketch>>
-ExtractMapsFromIntermediates(const std::vector<PredicateResult> &intermediates, size_t &n_max) {
+ExtractMapsFromIntermediates(const std::vector<PredicateResult>& intermediates, size_t& maxRecordCount) {
 	std::vector<std::shared_ptr<MinHashSketch>> result;
 	result.reserve(intermediates.size());
 
-	n_max = 0;
-	for (const auto &intermediate : intermediates) {
-		result.push_back(intermediate.sketch);
+	maxRecordCount = 0;
+	for (const auto& intermediate : intermediates) {
+		result.emplace_back(intermediate.sketch);
 		if (!intermediate.is_set_membership) {
-			n_max = std::max(n_max, intermediate.n_max);
+			maxRecordCount = std::max(maxRecordCount, intermediate.n_max);
 		}
 	}
 	return result;
 }
 
-double GetPSample(const std::vector<PredicateResult> &intermediates) {
-	double p_sample = 1.0;
-	for (const auto &intermediate : intermediates) {
-		p_sample *= intermediate.sampling_probability;
+double GetPSample(const std::vector<PredicateResult>& intermediates) {
+	double pSample = 1.0;
+	for (const auto& intermediate : intermediates) {
+		pSample *= intermediate.sampling_probability;
 	}
-	return p_sample;
+	return pSample;
 }
 
 std::shared_ptr<OmniSketchCell> CombinedPredicateEstimator::ComputeResult(size_t max_output_size) const {
@@ -159,34 +190,35 @@ std::shared_ptr<OmniSketchCell> CombinedPredicateEstimator::ComputeResult(size_t
 }
 
 std::shared_ptr<OmniSketchCell>
-CombinedPredicateEstimator::FilterProbeSet(const std::shared_ptr<OmniSketch> &omni_sketch,
-                                           const std::shared_ptr<OmniSketchCell> &probe_sample) const {
+CombinedPredicateEstimator::FilterProbeSet(const std::shared_ptr<OmniSketch>& omni_sketch,
+                                           const std::shared_ptr<OmniSketchCell>& probe_sample) const {
 	CombinedPredicateEstimator estimator(omni_sketch->MinHashSketchSize());
 	estimator.intermediate_results = intermediate_results;
 	estimator.AddPredicate(omni_sketch, probe_sample);
 	return estimator.ComputeResult(probe_sample->MaxSampleCount());
 }
 
-void CombinedPredicateEstimator::AddUnfilteredRids(const std::shared_ptr<OmniSketch> &omni_sketch) {
-	PredicateResult pred_result;
-	pred_result.selectivity =
-	    (double)(omni_sketch->RecordCount() - omni_sketch->CountNulls()) / (double)omni_sketch->RecordCount();
-	pred_result.is_set_membership = true;
+void CombinedPredicateEstimator::AddUnfilteredRids(const std::shared_ptr<OmniSketch>& omni_sketch) {
+	PredicateResult predicateResult;
+	predicateResult.selectivity = static_cast<double>(omni_sketch->RecordCount() - omni_sketch->CountNulls()) / 
+	                              static_cast<double>(omni_sketch->RecordCount());
+	predicateResult.is_set_membership = true;
 	// TODO: This is a bit unclean - theoretically we would have to compare with ALL rids in the sketch, not just
 	// max_sample_count
-	pred_result.sampling_probability = 1.0;
+	predicateResult.sampling_probability = 1.0;
 	auto all_rids = omni_sketch->GetRids();
-	pred_result.sketch = all_rids->GetMinHashSketch();
-	intermediate_results.push_back(pred_result);
+	predicateResult.sketch = all_rids->GetMinHashSketch();
+	intermediate_results.push_back(std::move(predicateResult));
 }
 
-void CombinedPredicateEstimator::AddUnfilteredRids(const std::shared_ptr<OmniSketchCell> &probe_sample,
+void CombinedPredicateEstimator::AddUnfilteredRids(const std::shared_ptr<OmniSketchCell>& probe_sample,
                                                    size_t base_card_p) {
+	base_card = std::max(base_card, probe_sample->RecordCount());
 	base_card = std::max(base_card, base_card_p);
-	PredicateResult pred_result {
-	    probe_sample->GetMinHashSketch(), 1.0, 1.0, 1.0, true, 0,
+	PredicateResult predicateResult{
+	    probe_sample->GetMinHashSketch(), 1.0, 1.0, 1.0, true, 0
 	};
-	intermediate_results.push_back(pred_result);
+	intermediate_results.push_back(std::move(predicateResult));
 }
 
 bool CombinedPredicateEstimator::HasPredicates() const {
@@ -199,19 +231,11 @@ void CombinedPredicateEstimator::Finalize() {
 		return;
 	}
 
-	std::map<double, size_t> ordered_entry_idxs;
-	for (size_t i = 0; i < intermediate_results.size(); i++) {
-		ordered_entry_idxs[intermediate_results[i].selectivity] = i;
-	}
-
-	std::vector<PredicateResult> new_intermediates;
-	new_intermediates.reserve(intermediate_results.size());
-
-	for (auto it = ordered_entry_idxs.rbegin(); it != ordered_entry_idxs.rend(); ++it) {
-		new_intermediates.push_back(intermediate_results[it->second]);
-	}
-
-	intermediate_results = new_intermediates;
+	// Use stable_sort to maintain order for equal selectivities and avoid the overhead of map
+	std::stable_sort(intermediate_results.begin(), intermediate_results.end(),
+	                 [](const PredicateResult& a, const PredicateResult& b) {
+		                 return a.selectivity > b.selectivity; // Descending order
+	                 });
 }
 
 } // namespace omnisketch

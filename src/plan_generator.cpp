@@ -2,16 +2,18 @@
 
 namespace omnisketch {
 
-void PlanGenerator::AddPredicate(const std::string &table_name, const std::string &column_name,
-                                 const std::shared_ptr<OmniSketchCell> &probe_set) {
+void PlanGenerator::AddPredicate(const std::string& table_name, const std::string& column_name,
+                                 const std::shared_ptr<OmniSketchCell>& probe_set) {
 	auto item = GetOrCreatePlanItem(table_name);
-	assert(item->predicates.find(column_name) == item->predicates.end());
+	if (item->predicates.find(column_name) != item->predicates.end()) {
+		throw std::runtime_error("Predicate already exists for column: " + table_name + "." + column_name);
+	}
 	item->predicates[column_name] = probe_set;
 }
 
-void PlanGenerator::AddJoin(const std::string &fk_table_name, const std::string &fk_column_name,
-                            const std::string &pk_table_name) {
-	auto &registry = Registry::Get();
+void PlanGenerator::AddJoin(const std::string& fk_table_name, const std::string& fk_column_name,
+                            const std::string& pk_table_name) {
+	auto& registry = Registry::Get();
 	auto fk_column_sketch = registry.GetOmniSketch(fk_table_name, fk_column_name);
 	auto fk_side_item = GetOrCreatePlanItem(fk_table_name);
 	auto pk_side_item = GetOrCreatePlanItem(pk_table_name);
@@ -19,47 +21,56 @@ void PlanGenerator::AddJoin(const std::string &fk_table_name, const std::string 
 	fk_side_item->probed_from.insert(pk_table_name);
 }
 
-bool PlanGenerator::CheckIfResolvable(const std::shared_ptr<PlanExecItem> &item) const {
+bool PlanGenerator::CheckIfResolvable(const std::shared_ptr<PlanExecItem>& item) const {
 	if (!item->probed_from.empty()) {
 		return false;
 	}
-	size_t not_resolvable_count = 0;
-	for (auto &fk_side_item_pair : item->probes_into) {
-		const auto &fk_side_item = plan_items.find(fk_side_item_pair.first)->second;
-		if (!fk_side_item->probes_into.empty() || fk_side_item->probed_from.size() != 1) {
+	
+	size_t notResolvableCount = 0;
+	for (const auto& fkSideItemPair : item->probes_into) {
+		const auto fkSideItemIt = plan_items.find(fkSideItemPair.first);
+		if (fkSideItemIt == plan_items.end()) {
+			continue; // Skip if item not found
+		}
+		
+		const auto& fkSideItem = fkSideItemIt->second;
+		if (!fkSideItem->probes_into.empty() || fkSideItem->probed_from.size() != 1) {
 			// FK side has other connections!
-			not_resolvable_count++;
+			++notResolvableCount;
 		}
 	}
-	return not_resolvable_count <= 1;
+	return notResolvableCount <= 1;
 }
 
-size_t GetMaxSampleCount(const std::string &table_name, const PlanItem &item) {
-	auto &registry = Registry::Get();
+size_t GetMaxSampleCount(const std::string& table_name, const PlanItem& item) {
+	auto& registry = Registry::Get();
 	if (item.predicates.empty()) {
 		return registry.GetMinHashSketchSize(table_name);
 	}
-	size_t max_sample_count = UINT64_MAX;
-	for (auto &predicate : item.predicates) {
+	
+	size_t maxSampleCount = UINT64_MAX;
+	for (const auto& predicate : item.predicates) {
 		auto sketch = registry.GetOmniSketch(table_name, predicate.first);
-		max_sample_count = std::min(max_sample_count, sketch->MinHashSketchSize());
+		maxSampleCount = std::min(maxSampleCount, sketch->MinHashSketchSize());
 	}
-	return max_sample_count;
+	return maxSampleCount;
 }
 
 std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> PlanGenerator::CreateInitialExecutionPlan() const {
-	std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> exec_items;
-	for (auto &plan_item_pair : plan_items) {
-		const auto &table_name = plan_item_pair.first;
-		auto &plan_item = plan_item_pair.second;
+	std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> execItems;
+	execItems.reserve(plan_items.size()); // Reserve space to avoid rehashing
+	
+	for (const auto& planItemPair : plan_items) {
+		const auto& tableName = planItemPair.first;
+		const auto& planItem = planItemPair.second;
 
-		auto exec_item = std::make_shared<PlanExecItem>();
-		exec_item->estimator = std::make_shared<CombinedPredicateEstimator>(GetMaxSampleCount(table_name, *plan_item));
-		exec_item->probes_into = plan_item->probes_into;
-		exec_item->probed_from = plan_item->probed_from;
-		exec_items[table_name] = exec_item;
+		auto execItem = std::make_shared<PlanExecItem>();
+		execItem->estimator = std::make_shared<CombinedPredicateEstimator>(GetMaxSampleCount(tableName, *planItem));
+		execItem->probes_into = planItem->probes_into;
+		execItem->probed_from = planItem->probed_from;
+		execItems.emplace(tableName, std::move(execItem));
 	}
-	return exec_items;
+	return execItems;
 }
 
 std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> PlanGenerator::RemoveUnselectiveJoins(
@@ -255,12 +266,14 @@ double PlanGenerator::EstimateCardinality() const {
 	return (double)card_est->RecordCount();
 }
 
-std::shared_ptr<PlanItem> PlanGenerator::GetOrCreatePlanItem(const std::string &table_name) {
-	auto item = plan_items[table_name];
-	if (!item) {
-		item = std::make_shared<PlanItem>();
-		plan_items[table_name] = item;
+std::shared_ptr<PlanItem> PlanGenerator::GetOrCreatePlanItem(const std::string& table_name) {
+	auto it = plan_items.find(table_name);
+	if (it != plan_items.end()) {
+		return it->second;
 	}
+	
+	auto item = std::make_shared<PlanItem>();
+	plan_items.emplace(table_name, item);
 	return item;
 }
 
