@@ -5,64 +5,70 @@
 namespace omnisketch {
 
 struct TableFilter {
-	std::string column_name;
-	std::shared_ptr<OmniSketchCell> probe_set;
-	std::string original_table_name = {};
-	std::string fk_column_name = {};
-	std::shared_ptr<PlanNode> other_side_plan = nullptr;
+    std::string column_name;
+    std::shared_ptr<OmniSketchCell> probe_set;
+    std::string original_table_name = {};
+    std::string fk_column_name = {};
+    std::shared_ptr<PlanNode> other_side_plan = nullptr;
 };
 
 struct RelationEdge {
-	std::string this_column_name;
-	std::string other_table_name;
-	std::string other_column_name;
+    std::string this_column_name;
+    std::string other_table_name;
+    std::string other_column_name;
 
-	bool is_fk_fk_join;
+    bool is_fk_fk_join;
 };
 
 struct RelationNode {
-	std::string name;
-	std::vector<TableFilter> filters;
-	std::unordered_multimap<std::string, RelationEdge> connections;
+    std::string name;
+    std::vector<TableFilter> filters;
+    std::unordered_multimap<std::string, RelationEdge> connections;
 
-	// debug
-	std::vector<std::string> contained_relations;
+    // debug
+    std::vector<std::string> contained_relations;
+};
+
+struct DpSizeResult {
+    std::set<std::string> relations;
+    double card_est;
+    size_t duration_ns;
 };
 
 class QueryGraph {
 public:
-	double Estimate();
+    double Estimate();
 
-	void AddConstantPredicate(const std::string &table_name, const std::string &column_name,
-	                          const std::shared_ptr<OmniSketchCell> &probe_set);
-	void AddPkFkJoin(const std::string &fk_table_name, const std::string &fk_column_name,
-	                 const std::string &pk_table_name);
-	void AddFkFkJoin(const std::string &table_name_1, const std::string &column_name_1, const std::string &table_name_2,
-	                 const std::string &column_name_2);
+    void AddConstantPredicate(const std::string& table_name, const std::string& column_name,
+                              const std::shared_ptr<OmniSketchCell>& probe_set);
+    void AddPkFkJoin(const std::string& fk_table_name, const std::string& fk_column_name,
+                     const std::string& pk_table_name);
+    void AddFkFkJoin(const std::string& table_name_1, const std::string& column_name_1, const std::string& table_name_2,
+                     const std::string& column_name_2);
 
 public:
-	void RunDpSizeAlgo();
+    std::vector<DpSizeResult> RunDpSizeAlgo();
 
 protected:
-	void AddEdge(const std::string &table_name_1, const std::string &column_name_1, const std::string &table_name_2,
-	             const std::string &column_name_2);
-	void RemoveEdge(const std::string &table_name_1, const std::string &column_name_1, const std::string &table_name_2,
-	                const std::string &column_name_2);
-	void RemoveEdgeOneSide(const std::string &table_name_1, const std::string &column_name_1,
-	                       const std::string &table_name_2, const std::string &column_name_2);
-	RelationNode &GetOrCreateNode(const std::string &table_name);
+    void AddEdge(const std::string& table_name_1, const std::string& column_name_1, const std::string& table_name_2,
+                 const std::string& column_name_2);
+    void RemoveEdge(const std::string& table_name_1, const std::string& column_name_1, const std::string& table_name_2,
+                    const std::string& column_name_2);
+    void RemoveEdgeOneSide(const std::string& table_name_1, const std::string& column_name_1,
+                           const std::string& table_name_2, const std::string& column_name_2);
+    RelationNode& GetOrCreateNode(const std::string& table_name);
 
-	// Helper methods
-	bool TryMergeSingleConnection();
-	bool TryMergeSingleFkFkConnection();
-	bool TryMergeMultiPkConnection();
-	bool TryExpandPkConnection();
+    // Helper methods
+    bool TryMergeSingleConnection();
+    bool TryMergeSingleFkFkConnection();
+    bool TryMergeMultiPkConnection();
+    bool TryExpandPkConnection();
 
-	void MergePkSideIntoFkSide(RelationNode &relation, RelationEdge &edge);
-	std::vector<std::vector<std::string>> FindCycles(const std::string &table_name);
-	static void AddFilterToPlan(PlanNode &plan, const TableFilter &filter);
+    void MergePkSideIntoFkSide(RelationNode& relation, RelationEdge& edge);
+    std::vector<std::vector<std::string>> FindCycles(const std::string& table_name);
+    static void AddFilterToPlan(PlanNode& plan, const TableFilter& filter);
 
-	std::unordered_map<std::string, RelationNode> graph;
+    std::unordered_map<std::string, RelationNode> graph;
 };
 
-} // namespace omnisketch
+}  // namespace omnisketch
