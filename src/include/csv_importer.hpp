@@ -2,11 +2,11 @@
 
 #include "execution/query_graph.hpp"
 #include "omni_sketch/pre_joined_omni_sketch.hpp"
-#include "registry.hpp"
 #include "plan_generator.hpp"
+#include "registry.hpp"
 
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <sstream>
 
 namespace omnisketch {
@@ -14,105 +14,104 @@ namespace omnisketch {
 enum class ColumnType { INT, UINT, DOUBLE, VARCHAR };
 
 struct RelationInfo {
-	std::vector<std::string> predicates;
-	std::map<std::string, std::string> join_conditions;
+    std::vector<std::string> predicates;
+    std::map<std::string, std::string> join_conditions;
 };
 
 struct CountQuery {
-	QueryGraph plan;
-	size_t cardinality = 0;
-	std::map<std::string, RelationInfo> rel_info;
+    QueryGraph plan;
+    size_t cardinality = 0;
+    std::map<std::string, RelationInfo> rel_info;
 };
 
 class CSVImporter {
 public:
-	static void ImportTable(const std::string &path, const std::string &table_name,
-	                        const std::vector<std::string> &column_names,
-	                        const std::vector<std::string> &referencing_table_names,
-	                        const std::vector<std::string> &referencing_column_names,
-	                        const std::vector<ColumnType> &types, const OmniSketchConfig &config = OmniSketchConfig());
-	static void ImportTable(const std::string &path, const std::string &table_name,
-	                        const std::vector<std::string> &column_names,
-	                        const std::vector<std::string> &referencing_table_names,
-	                        const std::vector<std::string> &referencing_column_names,
-	                        const std::vector<ColumnType> &types, std::vector<OmniSketchConfig> configs);
-	static void ImportTables(const std::string &path_to_definition_file);
-	static std::vector<CountQuery> ImportQueries(const std::string &path_to_query_file);
+    static void ImportTable(const std::string& path, const std::string& table_name,
+                            const std::vector<std::string>& column_names,
+                            const std::vector<std::string>& referencing_table_names,
+                            const std::vector<std::string>& referencing_column_names,
+                            const std::vector<ColumnType>& types, const OmniSketchConfig& config = OmniSketchConfig());
+    static void ImportTable(const std::string& path, const std::string& table_name,
+                            const std::vector<std::string>& column_names,
+                            const std::vector<std::string>& referencing_table_names,
+                            const std::vector<std::string>& referencing_column_names,
+                            const std::vector<ColumnType>& types, std::vector<OmniSketchConfig> configs);
+    static void ImportTables(const std::string& path_to_definition_file);
+    static std::vector<CountQuery> ImportQueries(const std::string& path_to_query_file);
 
-	static std::pair<std::vector<std::string>, std::vector<std::string>>
-	ExtractReferencingTables(const std::string &input);
-	static std::vector<std::string> Split(const std::string &line, char sep = ',');
+    static std::pair<std::vector<std::string>, std::vector<std::string>> ExtractReferencingTables(
+        const std::string& input);
+    static std::vector<std::string> Split(const std::string& line, char sep = ',');
 
-	template <typename T>
-	static T ConvertString(const std::string &) {
-		throw std::logic_error("Not implemented");
-	}
+    template <typename T>
+    static T ConvertString(const std::string&) {
+        throw std::logic_error("Not implemented");
+    }
 
-	template <typename T>
-	static std::function<void(const std::string &, const size_t)> CreateInsertFunc(const std::string &table_name,
-	                                                                               const std::string &column_name) {
-		auto &registry = Registry::Get();
-		auto sketch = registry.GetOmniSketchTyped<T>(table_name, column_name);
+    template <typename T>
+    static std::function<void(const std::string&, const size_t)> CreateInsertFunc(const std::string& table_name,
+                                                                                  const std::string& column_name) {
+        auto& registry = Registry::Get();
+        auto sketch = registry.GetOmniSketchTyped<T>(table_name, column_name);
 
-		return [sketch](const std::string &val, const size_t rid) {
-			if (val.empty()) {
-				sketch->AddNullValues(1);
-			} else {
-				sketch->AddRecord(ConvertString<T>(val), rid);
-			}
-		};
-	}
+        return [sketch](const std::string& val, const size_t rid) {
+            if (val.empty()) {
+                sketch->AddNullValues(1);
+            } else {
+                sketch->AddRecord(ConvertString<T>(val), rid);
+            }
+        };
+    }
 
-	template <typename T, typename U>
-	static std::function<void(const std::string &, const size_t)>
-	CreateInsertFunc(const std::string &table_name, const std::string &column_name,
-	                 const std::vector<std::string> &ref_tbl_names) {
-		auto &registry = Registry::Get();
-		auto sketch = registry.GetOmniSketchTyped<T>(table_name, column_name);
-		std::vector<std::shared_ptr<U>> ref_sketches;
-		for (const auto &ref_tbl_name : ref_tbl_names) {
-			auto ref_sketch = registry.FindReferencingOmniSketchTyped<U>(table_name, column_name, ref_tbl_name);
-			assert(ref_sketch);
-			ref_sketches.push_back(ref_sketch);
-		}
+    template <typename T, typename U>
+    static std::function<void(const std::string&, const size_t)> CreateInsertFunc(
+        const std::string& table_name, const std::string& column_name, const std::vector<std::string>& ref_tbl_names) {
+        auto& registry = Registry::Get();
+        auto sketch = registry.GetOmniSketchTyped<T>(table_name, column_name);
+        std::vector<std::shared_ptr<U>> ref_sketches;
+        for (const auto& ref_tbl_name : ref_tbl_names) {
+            auto ref_sketch = registry.FindReferencingOmniSketchTyped<U>(table_name, column_name, ref_tbl_name);
+            assert(ref_sketch);
+            ref_sketches.push_back(ref_sketch);
+        }
 
-		return [sketch, ref_sketches](const std::string &val, const size_t rid) {
-			if (val.empty()) {
-				sketch->AddNullValues(1);
-				for (auto &rs : ref_sketches) {
-					rs->AddNullValues(1);
-				}
-			}
-			sketch->AddRecord(ConvertString<T>(val), rid);
-			for (auto &rs : ref_sketches) {
-				rs->AddRecord(ConvertString<T>(val), rid);
-			}
-		};
-	}
+        return [sketch, ref_sketches](const std::string& val, const size_t rid) {
+            if (val.empty()) {
+                sketch->AddNullValues(1);
+                for (auto& rs : ref_sketches) {
+                    rs->AddNullValues(1);
+                }
+            }
+            sketch->AddRecord(ConvertString<T>(val), rid);
+            for (auto& rs : ref_sketches) {
+                rs->AddRecord(ConvertString<T>(val), rid);
+            }
+        };
+    }
 
 private:
-	static CountQuery ParseSingleQuery(const std::string& line);
-	static void ProcessJoins(const std::string& joinString, CountQuery& query);
-	static void ProcessPredicates(const std::string& predicateString, CountQuery& query);
-	static void ProcessSinglePredicate(const std::string& columnId, const std::string& operand, 
-	                                   const std::string& value, CountQuery& query,
-	                                   std::unordered_map<std::string, std::pair<std::string, bool>>& gtPredicates,
-	                                   std::unordered_map<std::string, std::pair<std::string, bool>>& ltPredicates);
-	static void ProcessGreaterThanPredicate(const std::string& columnId, const std::string& operand, 
-	                                        const std::string& value, const std::string& tableName, 
-	                                        const std::string& columnName, CountQuery& query,
-	                                        std::unordered_map<std::string, std::pair<std::string, bool>>& gtPredicates,
-	                                        std::unordered_map<std::string, std::pair<std::string, bool>>& ltPredicates);
-	static void ProcessLessThanPredicate(const std::string& columnId, const std::string& operand, 
-	                                     const std::string& value, const std::string& tableName, 
-	                                     const std::string& columnName, CountQuery& query,
-	                                     std::unordered_map<std::string, std::pair<std::string, bool>>& gtPredicates,
-	                                     std::unordered_map<std::string, std::pair<std::string, bool>>& ltPredicates);
-	static void ProcessInPredicate(const std::string& tableName, const std::string& columnName,
-	                               const std::string& value, bool isStringColumn, CountQuery& query);
-	static void ProcessRemainingRangePredicates(const std::unordered_map<std::string, std::pair<std::string, bool>>& gtPredicates,
-	                                            const std::unordered_map<std::string, std::pair<std::string, bool>>& ltPredicates,
-	                                            CountQuery& query);
+    static CountQuery ParseSingleQuery(const std::string& line);
+    static void ProcessJoins(const std::string& joinString, CountQuery& query);
+    static void ProcessPredicates(const std::string& predicateString, CountQuery& query);
+    static void ProcessSinglePredicate(const std::string& columnId, const std::string& operand,
+                                       const std::string& value, CountQuery& query,
+                                       std::unordered_map<std::string, std::pair<std::string, bool>>& gtPredicates,
+                                       std::unordered_map<std::string, std::pair<std::string, bool>>& ltPredicates);
+    static void ProcessGreaterThanPredicate(
+        const std::string& columnId, const std::string& operand, const std::string& value, const std::string& tableName,
+        const std::string& columnName, CountQuery& query,
+        std::unordered_map<std::string, std::pair<std::string, bool>>& gtPredicates,
+        std::unordered_map<std::string, std::pair<std::string, bool>>& ltPredicates);
+    static void ProcessLessThanPredicate(const std::string& columnId, const std::string& operand,
+                                         const std::string& value, const std::string& tableName,
+                                         const std::string& columnName, CountQuery& query,
+                                         std::unordered_map<std::string, std::pair<std::string, bool>>& gtPredicates,
+                                         std::unordered_map<std::string, std::pair<std::string, bool>>& ltPredicates);
+    static void ProcessInPredicate(const std::string& tableName, const std::string& columnName,
+                                   const std::string& value, bool isStringColumn, CountQuery& query);
+    static void ProcessRemainingRangePredicates(
+        const std::unordered_map<std::string, std::pair<std::string, bool>>& gtPredicates,
+        const std::unordered_map<std::string, std::pair<std::string, bool>>& ltPredicates, CountQuery& query);
 };
 
-} // namespace omnisketch
+}  // namespace omnisketch

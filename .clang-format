@@ -1,7 +1,7 @@
 ---
 BasedOnStyle: Google
 Language: Cpp
-Standard: Cpp17
+Standard: c++14
 
 # Indentation
 IndentWidth: 4
@@ -53,7 +53,7 @@ SpacesInParentheses: false
 SpacesInSquareBrackets: false
 
 # Includes
-SortIncludes: false
+SortIncludes: CaseSensitive
 IncludeBlocks: Preserve
 
 # Other formatting

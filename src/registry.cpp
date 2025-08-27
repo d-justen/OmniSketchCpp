@@ -5,8 +5,8 @@ namespace omnisketch {
 Registry::Registry() = default;
 
 Registry& Registry::Get() {
-	static Registry instance;
-	return instance;
+    static Registry instance;
+    return instance;
 }
 
-} // namespace omnisketch
+}  // namespace omnisketch
