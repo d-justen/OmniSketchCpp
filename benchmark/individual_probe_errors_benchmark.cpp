@@ -83,14 +83,14 @@ public:
 
         std::shuffle(all_values.begin(), all_values.end(), random_generator);
         std::vector<size_t> probe_set(all_values.begin(), all_values.begin() + probe_set_size);
-        double actualCardinality = 0.0;
+        double actual_cardinality = 0.0;
         for (const auto value : probe_set) {
-            actualCardinality += cardinalities[value];
+            actual_cardinality += cardinalities[value];
         }
 
         for (auto _ : state) {
             const auto card = omni_sketch->ProbeSet(probe_set.data(), probe_set.size());
-            SetCounters(state, ComputeQError(card->RecordCount(), actualCardinality));
+            SetCounters(state, ComputeQError(card->RecordCount(), actual_cardinality));
         }
     }
 
