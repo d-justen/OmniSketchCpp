@@ -37,7 +37,7 @@ public:
 
         if (!omni_sketch) {
             omni_sketch = std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(SKETCH_WIDTH, SKETCH_DEPTH,
-                                                                                    min_hash_sample_size);
+                                                                                     min_hash_sample_size);
             cardinalities = FillOmniSketch(*omni_sketch, IsUniform);
             all_values.resize(attribute_count);
             for (size_t valueIdx = 1; valueIdx < attribute_count + 1; ++valueIdx) {

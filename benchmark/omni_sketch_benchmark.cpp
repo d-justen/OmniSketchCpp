@@ -84,15 +84,14 @@ BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, PointQueryFlattened, 1, 1, 1)
     state.counters["OmniSketchSizeMB"] = static_cast<double>(omni_sketch->EstimateByteSize()) / 1024.0 / 1024.0;
 }
 
-BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, ConjunctPointQueries, WIDTH, DEPTH,
-                            10 * BYTES_PER_MB / BYTES_PER_SAMPLE)
+BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, ConjunctPointQueries, WIDTH, DEPTH, 10 * BYTES_PER_MB / BYTES_PER_SAMPLE)
 (::benchmark::State& state) {
     FillOmniSketch(ATTRIBUTE_VALUE_COUNT, 50);
-    auto omniSketch2 = std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(
-        WIDTH, DEPTH, 10 * BYTES_PER_MB / BYTES_PER_SAMPLE);
+    auto omniSketch2 =
+        std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(WIDTH, DEPTH, 10 * BYTES_PER_MB / BYTES_PER_SAMPLE);
     FillOmniSketch(ATTRIBUTE_VALUE_COUNT, 30, omniSketch2.get());
-    auto omniSketch3 = std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(
-        WIDTH, DEPTH, 10 * BYTES_PER_MB / BYTES_PER_SAMPLE);
+    auto omniSketch3 =
+        std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(WIDTH, DEPTH, 10 * BYTES_PER_MB / BYTES_PER_SAMPLE);
     FillOmniSketch(ATTRIBUTE_VALUE_COUNT, 20, omniSketch3.get());
 
     std::shared_ptr<omnisketch::OmniSketchCell> card;
@@ -111,11 +110,11 @@ BENCHMARK_TEMPLATE_DEFINE_F(OmniSketchFixture, ConjunctPointQueriesFlattened, WI
                             10 * BYTES_PER_MB / BYTES_PER_SAMPLE)
 (::benchmark::State& state) {
     FillOmniSketch(ATTRIBUTE_VALUE_COUNT, 50);
-    auto omniSketch2 = std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(
-        WIDTH, DEPTH, 10 * BYTES_PER_MB / BYTES_PER_SAMPLE);
+    auto omniSketch2 =
+        std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(WIDTH, DEPTH, 10 * BYTES_PER_MB / BYTES_PER_SAMPLE);
     FillOmniSketch(ATTRIBUTE_VALUE_COUNT, 30, omniSketch2.get());
-    auto omniSketch3 = std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(
-        WIDTH, DEPTH, 10 * BYTES_PER_MB / BYTES_PER_SAMPLE);
+    auto omniSketch3 =
+        std::make_shared<omnisketch::TypedPointOmniSketch<size_t>>(WIDTH, DEPTH, 10 * BYTES_PER_MB / BYTES_PER_SAMPLE);
     FillOmniSketch(ATTRIBUTE_VALUE_COUNT, 20, omniSketch3.get());
 
     omni_sketch->Flatten();

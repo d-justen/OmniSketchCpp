@@ -7,7 +7,7 @@ template <unsigned int MaxSampleSize, unsigned int MatchCount>
 class MinHashSketchFixture : public benchmark::Fixture {
 public:
     void SetUp(::benchmark::State& state) override {
-        const size_t sketch_count = static_cast<size_t>(state.range());
+        const auto sketch_count = static_cast<size_t>(state.range());
 
         sketches.reserve(sketch_count);
         auto hash_function = std::make_shared<omnisketch::MurmurHashFunction<size_t>>();

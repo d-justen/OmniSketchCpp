@@ -110,7 +110,6 @@ public:
         return table_entry != sketches.end() && table_entry->second.find(column_name) != table_entry->second.end();
     }
 
-    // TODO: Taking any sketch for a rid sample could be a bad idea - what if it has many nulls? -> Create OS on rids!
     std::shared_ptr<OmniSketchCell> ProduceRidSample(const std::string& table_name) {
         assert(sketches.find(table_name) != sketches.end());
         return sketches[table_name].begin()->second.main_sketch->GetRids();
@@ -393,7 +392,7 @@ public:
         while ((entry = readdir(dir)) != nullptr) {
             if (entry->d_type == DT_REG || entry->d_type == DT_UNKNOWN) {
                 std::string filename(entry->d_name);
-                if (hasJsonExtension(filename)) {
+                if (HasJsonExtension(filename)) {
                     std::string fullPath = path;
                     if (fullPath.back() != '/') {
                         fullPath += '/';
@@ -414,7 +413,7 @@ private:
     std::unordered_map<std::string, TableEntry> sketches;
     std::unordered_map<std::string, std::shared_ptr<OmniSketchCell>> rid_sketches;
 
-    bool hasJsonExtension(const std::string& filename) {
+    bool HasJsonExtension(const std::string& filename) {
         const std::string extension = ".json";
         if (filename.length() >= extension.length()) {
             return (0 == filename.compare(filename.length() - extension.length(), extension.length(), extension));

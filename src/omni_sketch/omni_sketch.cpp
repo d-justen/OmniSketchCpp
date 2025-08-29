@@ -1,5 +1,7 @@
 #include "omni_sketch/omni_sketch.hpp"
 
+#include <utility>
+
 #include "min_hash_sketch/min_hash_sketch_map.hpp"
 #include "omni_sketch/omni_sketch_cell.hpp"
 #include "util/hash.hpp"
@@ -181,7 +183,7 @@ void PointOmniSketch::SetRecordCount(size_t record_count_p) {
 }
 
 void PointOmniSketch::SetCell(size_t row_idx, size_t col_idx, std::shared_ptr<OmniSketchCell> cell) {
-    cells[row_idx][col_idx] = cell;
+    cells[row_idx][col_idx] = std::move(cell);
 }
 
 }  // namespace omnisketch

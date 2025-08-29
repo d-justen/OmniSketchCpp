@@ -197,8 +197,6 @@ void CombinedPredicateEstimator::AddUnfilteredRids(const std::shared_ptr<OmniSke
     predicate_result.selectivity = static_cast<double>(omni_sketch->RecordCount() - omni_sketch->CountNulls()) /
                                    static_cast<double>(omni_sketch->RecordCount());
     predicate_result.is_set_membership = true;
-    // TODO: This is a bit unclean - theoretically we would have to compare with ALL rids in the sketch, not just
-    // max_sample_count
     predicate_result.sampling_probability = 1.0;
     auto all_rids = omni_sketch->GetRids();
     predicate_result.sketch = all_rids->GetMinHashSketch();

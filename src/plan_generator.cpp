@@ -57,8 +57,8 @@ size_t GetMaxSampleCount(const std::string& table_name, const PlanItem& item) {
 }
 
 std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> PlanGenerator::CreateInitialExecutionPlan() const {
-    std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> execItems;
-    execItems.reserve(plan_items.size());  // Reserve space to avoid rehashing
+    std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> exec_items;
+    exec_items.reserve(plan_items.size());  // Reserve space to avoid rehashing
 
     for (const auto& plan_item_pair : plan_items) {
         const auto& table_name = plan_item_pair.first;
@@ -68,9 +68,9 @@ std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> PlanGenerator::Cr
         exec_item->estimator = std::make_shared<CombinedPredicateEstimator>(GetMaxSampleCount(table_name, *plan_item));
         exec_item->probes_into = plan_item->probes_into;
         exec_item->probed_from = plan_item->probed_from;
-        execItems.emplace(table_name, std::move(exec_item));
+        exec_items.emplace(table_name, std::move(exec_item));
     }
-    return execItems;
+    return exec_items;
 }
 
 std::unordered_map<std::string, std::shared_ptr<PlanExecItem>> PlanGenerator::RemoveUnselectiveJoins(

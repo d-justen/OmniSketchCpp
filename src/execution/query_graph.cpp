@@ -365,7 +365,7 @@ bool QueryGraph::TryExpandPkConnection() {
                     }
 
                     if (other_node.filters.empty()) {
-                        // TODO: How do we set this?
+                        // TODO: Find a more meaningful default
                         sample_count = 1024;
                     }
 

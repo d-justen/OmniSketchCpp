@@ -84,7 +84,6 @@ std::shared_ptr<MinHashSketch> MinHashSketchMap::Copy() const {
 }
 
 size_t MinHashSketchMap::EstimateByteSize() const {
-    // TODO
     const size_t max_count_size = sizeof(size_t);
     const size_t set_overhead = 16 + 16;
     const size_t per_item_size = 2 * (32 + sizeof(uint64_t));

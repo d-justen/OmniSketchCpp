@@ -4,9 +4,9 @@
 
 #include "csv_importer.hpp"
 
-constexpr size_t kDefaultWidth = 16;
-constexpr size_t kDefaultDepth = 3;
-constexpr size_t kDefaultCellSize = 32;
+constexpr size_t DEFAULT_WIDTH = 16;
+constexpr size_t DEFAULT_DEPTH = 3;
+constexpr size_t DEFAULT_CELL_SIZE = 32;
 
 void PrintUsage(const std::string& programName) {
     std::cout << "Usage: " << programName
@@ -74,19 +74,19 @@ int main(int argc, char* argv[]) {
     if (options.find("width") != options.end()) {
         config.SetWidth(std::stoul(options["width"]));
     } else {
-        config.SetWidth(kDefaultWidth);
+        config.SetWidth(DEFAULT_WIDTH);
     }
 
     if (options.find("depth") != options.end()) {
         config.depth = std::stoul(options["depth"]);
     } else {
-        config.depth = kDefaultDepth;
+        config.depth = DEFAULT_DEPTH;
     }
 
     if (options.find("cell_size") != options.end()) {
         config.sample_count = std::stoul(options["cell_size"]);
     } else {
-        config.sample_count = kDefaultCellSize;
+        config.sample_count = DEFAULT_CELL_SIZE;
     }
 
     auto& registry = omnisketch::Registry::Get();
@@ -95,30 +95,30 @@ int main(int argc, char* argv[]) {
     if (options.find("ref_sketch") != options.end()) {
         config.referencing_type = std::make_shared<omnisketch::OmniSketchType>(omnisketch::OmniSketchType::PRE_JOINED);
         registry.Deserialize(options["ref_sketch"]);
-        nlohmann::json jsonObj;
+        nlohmann::json json_obj;
         std::ifstream file;
         file.open(options["ref_sketch"]);
-        file >> jsonObj;
+        file >> json_obj;
         file.close();
-        referencing_table_name = jsonObj["table_name"];
-        const std::string referencingColumnName = jsonObj["column_name"];
+        referencing_table_name = json_obj["table_name"];
+        const std::string referencingColumnName = json_obj["column_name"];
 
-        omnisketch::CSVImporter::ImportTable(options["in"], options["table_name"], column_names, {referencing_table_name},
-                                             {referencingColumnName}, data_types, config);
+        omnisketch::CSVImporter::ImportTable(options["in"], options["table_name"], column_names,
+                                             {referencing_table_name}, {referencingColumnName}, data_types, config);
     } else {
         omnisketch::CSVImporter::ImportTable(options["in"], options["table_name"], column_names, {}, {}, data_types,
                                              config);
     }
 
     for (size_t i = 1; i < column_names.size(); ++i) {
-        const auto& columnName = column_names[i];
-        std::string outputFilePath = options["out"] + "/";
-        outputFilePath += options["table_name"] + "__" + columnName;
+        const auto& column_name = column_names[i];
+        std::string output_file_path = options["out"] + "/";
+        output_file_path += options["table_name"] + "__" + column_name;
         if (!referencing_table_name.empty()) {
-            outputFilePath += "__" + referencing_table_name;
+            output_file_path += "__" + referencing_table_name;
         }
-        outputFilePath += ".json";
-        omnisketch::Registry::Serialize(options["table_name"], columnName, referencing_table_name, outputFilePath);
+        output_file_path += ".json";
+        omnisketch::Registry::Serialize(options["table_name"], column_name, referencing_table_name, output_file_path);
     }
 
     omnisketch::Registry::Serialize(options["table_name"], {}, {},
